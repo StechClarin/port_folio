@@ -13,13 +13,22 @@ const Header = () => {
           Full Stack Developer & DevOps Engineer
         </p>
         <div className="mt-10 flex justify-center gap-8 text-lg">
-          <a href="#projects" className="text-violet-400 hover:text-white transition-all hover:scale-110">
+          <a
+            href="#projects"
+            className="text-violet-400 hover:text-white transition-all hover:scale-110"
+          >
             Mes Projets
           </a>
-          <a href="#about" className="text-violet-400 hover:text-white transition-all hover:scale-110">
+          <a
+            href="#about"
+            className="text-violet-400 hover:text-white transition-all hover:scale-110"
+          >
             À propos
           </a>
-          <a href="#contact" className="text-violet-400 hover:text-white transition-all hover:scale-110">
+          <a
+            href="#contact"
+            className="text-violet-400 hover:text-white transition-all hover:scale-110"
+          >
             Contact
           </a>
         </div>

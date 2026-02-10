@@ -1,26 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Default Dark Theme */
+    --bg-primary: 17 24 39;
+    /* gray-900 */
+    --bg-secondary: 31 41 55;
+    /* gray-800 */
+    --text-primary: 243 244 246;
+    /* gray-100 */
+    --text-secondary: 209 213 219;
+    /* gray-300 */
+    --accent-primary: 139 92 246;
+    /* violet-500 */
+    --accent-secondary: 167 139 250;
+    /* violet-400 */
+  }
+
+  body {
+    @apply font-sans bg-[rgb(var(--bg-primary))] text-[rgb(var(--text-primary))] transition-colors duration-300;
+  }
+}
+
+/* Custom Utilities based on variables */
+@layer utilities {
+  .bg-theme-primary {
+    background-color: rgb(var(--bg-primary));
+  }
+
+  .bg-theme-secondary {
+    background-color: rgb(var(--bg-secondary));
+  }
+
+  .text-theme-primary {
+    color: rgb(var(--text-primary));
+  }
+
+  .text-theme-secondary {
+    color: rgb(var(--text-secondary));
+  }
+}
+
 html {
   scroll-behavior: smooth;
 }
 
-body {
-  font-family: 'Poppins', sans-serif;
-}
-
 /* Glow pour un effet magique */
 .text-glow {
-  text-shadow: 0 0 10px rgba(168, 85, 247, 0.8),
+  text-shadow:
+    0 0 10px rgba(168, 85, 247, 0.8),
     0 0 20px rgba(59, 130, 246, 0.6);
 }
 
 /* Carte avec effet d’ombre vivante */
 .card-shadow {
-  box-shadow: 0 0 30px rgba(109, 40, 217, 0.2),
+  box-shadow:
+    0 0 30px rgba(109, 40, 217, 0.2),
     0 0 10px rgba(59, 130, 246, 0.2);
   transition: all 0.3s ease-in-out;
 }
 
 .card-shadow:hover {
-  box-shadow: 0 0 40px rgba(109, 40, 217, 0.4),
+  box-shadow:
+    0 0 40px rgba(109, 40, 217, 0.4),
     0 0 20px rgba(59, 130, 246, 0.4);
   transform: translateY(-4px);
 }
