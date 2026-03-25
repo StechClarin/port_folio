@@ -13,6 +13,7 @@ import {
   LogOut,
   Menu,
   X,
+  Layers,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -42,6 +43,11 @@ const AdminLayout = () => {
       path: '/admin/projects',
       label: 'Projects',
       icon: <FolderOpen size={20} />,
+    },
+    {
+      path: '/admin/project-store',
+      label: 'App Store',
+      icon: <Layers size={20} />,
     },
     {
       path: '/admin/experience',
@@ -87,7 +93,7 @@ const AdminLayout = () => {
         } md:block`}
       >
         <div className="flex items-center justify-between p-4 border-b border-gray-700">
-          <h1 className="text-xl font-bold text-violet-500">Admin Panel</h1>
+          <h1 className="text-xl font-bold text-violet-500">EtherNanos Admin</h1>
           <button
             onClick={() => setIsSidebarOpen(false)}
             className="md:hidden text-gray-400 hover:text-white"

@@ -1,332 +1,291 @@
-import React, { useState } from 'react';
-import { Swiper, SwiperSlide } from 'swiper/react';
-import 'swiper/css';
-import 'swiper/css/effect-coverflow';
-import 'swiper/css/effect-fade';
-import 'swiper/css/pagination';
-import {
-  EffectCoverflow,
-  EffectFade,
-  Pagination,
-  Autoplay,
-} from 'swiper/modules';
-import { LayoutGrid, List, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Loader2, ArrowRight, ChevronLeft, ChevronRight, LayoutGrid, List, Github, ExternalLink } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import ethernanosImg from '../assets/ethernanos.png';
 
 import { usePortfolioData } from '../hooks/usePortfolioData';
 
 const Projects = () => {
   const { projects, loading } = usePortfolioData();
   const [isGridView, setIsGridView] = useState(false);
+  const [centerIndex, setCenterIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const autoplayRef = useRef(null);
+
+  const ethernanosProject = {
+    id: 'static-ethernanos',
+    title: 'EtherNanos Hub',
+    description: "Système d'exploitation décentralisé pour applications métier. Haute performance, architecture Rust/Tauri et synchronisation temps-réel sécurisée.",
+    image_url: ethernanosImg,
+    technologies: ['Rust', 'Tauri', 'Angular', 'PostgreSQL', 'C++'],
+    project_url: '/ethernanos',
+    demo_url: null,
+    repo_url: 'https://github.com/stechclarin/ethernanos-launcher'
+  };
+
+  const allProjects = [ethernanosProject, ...(projects || [])];
+  const total = allProjects.length;
+
+  const handleNext = () => setCenterIndex((prev) => (prev + 1) % total);
+  const handlePrev = () => setCenterIndex((prev) => (prev - 1 + total) % total);
+
+  // Autoplay Loop
+  useEffect(() => {
+    if (isGridView || isPaused) {
+      if (autoplayRef.current) clearInterval(autoplayRef.current);
+      return;
+    }
+    autoplayRef.current = setInterval(handleNext, 9000);
+    return () => clearInterval(autoplayRef.current);
+  }, [isGridView, isPaused, total]);
 
   if (loading) {
     return (
-      <section id="projects" className="py-20 bg-theme-primary flex justify-center items-center">
-        <Loader2 className="animate-spin text-violet-500" size={48} />
+      <section id="projects" className="py-24 bg-[#0a0a0a] flex justify-center items-center">
+        <Loader2 className="animate-spin text-violet-500/50" size={40} />
       </section>
     );
   }
 
-  // Filter out non-featured if needed or just show all. Admin has 'is_featured' flag.
-  // For now show all, maybe sort by display_order (handled in hook)
+  // --- 5-SLOT STACK ARCHITECTURE ---
+  const getSlotStyle = (offset) => {
+    const baseW = 720;
+    const baseH = 450;
+
+    switch (offset) {
+      case 0: // O (Focus)
+        return {
+          width: `${baseW}px`,
+          height: `${baseH}px`,
+          left: '50%',
+          transform: 'translateX(-50%) scale(1)',
+          zIndex: 100,
+          opacity: 1,
+          filter: 'brightness(1)',
+          pointerEvents: 'auto'
+        };
+      case -1: // B (Left 1)
+        return {
+          width: `${baseW}px`,
+          height: `${baseH}px`,
+          left: 'calc(50% - 200px)',
+          transform: 'translateX(-100%) scale(0.75)',
+          zIndex: 80,
+          opacity: 1,
+          filter: 'brightness(0.35)',
+          pointerEvents: 'none'
+        };
+      case 1: // X (Right 1)
+         return {
+          width: `${baseW}px`,
+          height: `${baseH}px`,
+          left: 'calc(50% + 200px)',
+          transform: 'translateX(0%) scale(0.75)',
+          zIndex: 80,
+          opacity: 1,
+          filter: 'brightness(0.35)',
+          pointerEvents: 'none'
+        };
+      case -2: // A (Left 2)
+        return {
+          width: `${baseW}px`,
+          height: `${baseH}px`,
+          left: 'calc(50% - 360px)',
+          transform: 'translateX(-100%) scale(0.55)',
+          zIndex: 60,
+          opacity: 1,
+          filter: 'brightness(0.12)',
+          pointerEvents: 'none'
+        };
+      case 2: // Y (Right 2)
+        return {
+          width: `${baseW}px`,
+          height: `${baseH}px`,
+          left: 'calc(50% + 360px)',
+          transform: 'translateX(0%) scale(0.55)',
+          zIndex: 60,
+          opacity: 1,
+          filter: 'brightness(0.12)',
+          pointerEvents: 'none'
+        };
+      default:
+        return { opacity: 0, pointerEvents: 'none', zIndex: 0 };
+    }
+  };
 
   return (
-    <section
-      id="projects"
-      className="relative py-20 bg-theme-primary overflow-hidden transition-colors duration-300"
-    >
-      {/* Halo violet doux */}
-      <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_center,_#7C3AED_0%,_transparent_70%)] blur-3xl"></div>
-
-      <div className="relative z-10 max-w-7xl mx-auto px-6">
-        <div className="flex justify-between items-center mb-12">
-          <h2 className="text-3xl md:text-5xl font-extrabold text-theme-primary tracking-wider [text-shadow:0_0_25px_#7C3AED,0_0_10px_#4C1D95]">
-            My Projects
-          </h2>
+    <section id="projects" className="relative py-4 bg-[#050505] text-white transition-all duration-1000 overflow-hidden">
+      
+      <div className="relative z-10 max-w-7xl mx-auto px-8">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-12 mb-16 border-b border-white/5 pb-10">
+          <div className="space-y-4">
+            <h2 className="text-5xl md:text-7xl font-light tracking-tighter text-white">
+              Selected <span className="font-bold text-violet-500">Works</span>
+            </h2>
+            <p className="text-gray-500 text-lg md:text-xl font-medium max-w-2xl leading-relaxed">
+              Une sélection de solutions techniques robustes et d'expériences numériques immersives.
+            </p>
+          </div>
+          
           <button
             onClick={() => setIsGridView(!isGridView)}
-            className="p-3 bg-theme-secondary rounded-full hover:bg-violet-700 transition-colors shadow-lg border border-violet-500/30 group"
-            title={isGridView ? 'View as Carousel' : 'View as Grid'}
+            className="flex items-center gap-3 px-6 py-3 bg-[#141414] border border-white/10 rounded-full hover:bg-white/5 transition-all group shadow-xl"
           >
-            {isGridView ? (
-              <LayoutGrid className="text-violet-400 group-hover:text-white" size={24} />
-            ) : (
-              <List className="text-violet-400 group-hover:text-white" size={24} />
-            )}
+            <span className="text-xs font-black tracking-widest uppercase">
+              {isGridView ? 'Carousel Mode' : 'Stack Mode'}
+            </span>
+            {isGridView ? <List size={18} /> : <LayoutGrid size={18} />}
           </button>
         </div>
 
-        {projects.length === 0 ? (
-          <div className="text-center text-gray-400 py-10">
-            <p>Projects coming soon...</p>
-          </div>
-        ) : isGridView ? (
-          /* --- Grid View --- */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {projects.map((project, index) => (
-              <div
-                key={project.id || index}
-                className="group bg-theme-secondary/40 backdrop-blur-md rounded-3xl shadow-xl overflow-hidden flex flex-col hover:-translate-y-3 transition-all duration-500 border border-white/10 hover:border-violet-500/30 hover:shadow-violet-500/20"
-              >
-                <div className="relative h-56 overflow-hidden">
-                  <img
-                    src={project.image_url || 'https://via.placeholder.com/800x400/7C3AED/FFFFFF?text=Project'}
-                    alt={project.title}
-                    className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/40 to-transparent"></div>
-                  <div className="absolute bottom-4 left-6">
-                    <h3 className="text-xl font-bold text-white tracking-wide [text-shadow:0_4px_12px_rgba(0,0,0,0.5)] group-hover:text-violet-300 transition-colors">
-                      {project.title}
-                    </h3>
-                  </div>
-                </div>
-                <div className="p-6 flex flex-col flex-grow">
-                  <p className="text-theme-secondary text-sm mb-6 flex-grow leading-relaxed line-clamp-3">
-                    {project.description}
-                  </p>
-                  <div className="flex flex-wrap gap-2 mb-6">
-                    {(project.technologies || []).map((tech, i) => (
-                      <span
-                        key={i}
-                        className="px-3 py-1 bg-violet-500/10 text-violet-300 rounded-full text-xs font-medium border border-violet-500/20"
-                      >
-                        {tech}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="grid grid-cols-3 gap-3 mt-auto pt-4 border-t border-gray-700/50">
-                    <a
-                      href={project.demo_url || '#'}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={`flex items-center justify-center py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-semibold transition-all shadow-lg hover:shadow-violet-500/25 ${!project.demo_url ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      Demo
-                    </a>
-                    {/* Assuming project_url was intended for 'Detail View' but effectively redundant with Demo/Repo in this layout, or maybe it is the same as Demo? Keeping logic consistent with previous code */}
-                    <a
-                      href={project.project_url || '#'}
-                      className="flex items-center justify-center py-2.5 bg-theme-primary hover:bg-theme-secondary text-theme-primary rounded-xl text-sm font-medium transition-all border border-gray-700 hover:border-gray-600"
-                    >
-                      Voir
-                    </a>
-                    <a
-                      href={project.repo_url || '#'}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={`flex items-center justify-center py-2.5 bg-transparent hover:bg-gray-800/50 text-gray-400 hover:text-white rounded-xl text-sm font-medium transition-all border border-gray-700/50 hover:border-gray-600 ${!project.repo_url ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      Code
-                    </a>
-                  </div>
-                </div>
-              </div>
+        {isGridView ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12 my-12">
+            {allProjects.map((project) => (
+                <ProjectCard key={project.id} project={project} />
             ))}
           </div>
         ) : (
-          <>
-            {/* --- Desktop View: 3D Coverflow --- */}
-            <div className="hidden md:block">
-              <Swiper
-                effect="coverflow"
-                grabCursor={true}
-                centeredSlides={true}
-                slidesPerView="auto"
-                loop={projects.length > 2} // Only loop if enough items
-                autoplay={{
-                  delay: 3500,
-                  disableOnInteraction: false,
-                  pauseOnMouseEnter: true,
-                }}
-                coverflowEffect={{
-                  rotate: 45,
-                  stretch: 0,
-                  depth: 120,
-                  modifier: 1.2,
-                  slideShadows: true,
-                }}
-                pagination={{ clickable: true }}
-                modules={[EffectCoverflow, Pagination, Autoplay]}
-                className="mySwiper"
-                breakpoints={{
-                  640: { slidesPerView: 1 },
-                  768: { slidesPerView: 2 },
-                  1024: { slidesPerView: 3 },
-                }}
-              >
-                {projects.map((project, index) => (
-                  <SwiperSlide
-                    key={project.id || index}
-                    className="transition-transform duration-500"
-                  >
-                    <div className="group bg-theme-secondary/60 backdrop-blur-xl rounded-3xl shadow-[0_8px_32px_rgba(0,0,0,0.3)] overflow-hidden h-[36rem] flex flex-col hover:shadow-[0_20px_40px_rgba(124,58,237,0.15)] hover:border-violet-500/40 border border-white/5 transition-all duration-500">
-                      <div className="relative h-1/2 overflow-hidden">
-                        <img
-                          src={project.image_url || 'https://via.placeholder.com/800x400/7C3AED/FFFFFF?text=Project'}
-                          alt={project.title}
-                          className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-1000"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent opacity-90"></div>
-                        <div className="absolute top-4 right-4 bg-black/40 backdrop-blur-md px-3 py-1 rounded-full text-xs font-mono text-violet-300 border border-violet-500/30">
-                          {(project.technologies && project.technologies[0]) || 'Dev'}
-                        </div>
-                      </div>
-                      <div className="p-8 flex flex-col flex-grow relative -mt-12 bg-gradient-to-b from-transparent to-theme-secondary/90">
-                        <div className="bg-theme-secondary/80 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/5 mb-6 transform -translate-y-6 group-hover:-translate-y-8 transition-transform duration-500">
-                          <h3 className="text-2xl font-bold text-theme-primary mb-2 tracking-wide group-hover:text-violet-400 transition-colors">
-                            {project.title}
-                          </h3>
-                          <p className="text-theme-secondary text-sm leading-relaxed line-clamp-2">
-                            {project.description}
-                          </p>
-                        </div>
-                        <div className="mt-auto">
-                          <div className="flex flex-wrap gap-2 mb-8 justify-center">
-                            {(project.technologies || []).map((tech, i) => (
-                              <span
-                                key={i}
-                                className="px-3 py-1 bg-gray-800/50 text-gray-300 rounded-full text-xs font-medium border border-gray-700 group-hover:border-violet-500/30 transition-colors"
-                              >
-                                {tech}
-                              </span>
-                            ))}
-                          </div>
-                          <div className="grid grid-cols-3 gap-4">
-                            <a
-                              href={project.demo_url || '#'}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className={`flex items-center justify-center py-3 bg-white text-gray-900 rounded-xl font-bold hover:bg-violet-300 transition-all transform hover:-translate-y-1 shadow-lg ${!project.demo_url ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                              Demo
-                            </a>
-                            <a
-                              href={project.project_url || '#'}
-                              className="flex items-center justify-center py-3 bg-gray-700/50 text-white rounded-xl font-semibold hover:bg-gray-700 transition-all transform hover:-translate-y-1 border border-white/10"
-                            >
-                              Voir
-                            </a>
-                            <a
-                              href={project.repo_url || '#'}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className={`flex items-center justify-center py-3 bg-transparent text-white rounded-xl font-semibold hover:bg-white/10 transition-all border border-white/20 hover:border-white/40 ${!project.repo_url ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                              Github
-                            </a>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </SwiperSlide>
-                ))}
-              </Swiper>
-            </div>
+          /* REDUCED CAROUSEL CONTAINER HEIGHT */
+          <div 
+            className="relative w-[82%] mx-auto h-[530px] flex flex-col items-center justify-center space-y-12 my-6"
+            onMouseEnter={() => setIsPaused(true)}
+            onMouseLeave={() => setIsPaused(false)}
+          >
+            <div className="relative w-full h-[450px] flex items-center justify-center">
+                
+                {/* NAVIGATION (Discreet) */}
+                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex justify-between px-[-1.5rem] md:-left-28 md:-right-28 z-[110] pointer-events-none">
+                    <button onClick={handlePrev} className="p-5 bg-white/5 backdrop-blur-2xl border border-white/10 rounded-full text-white/30 hover:text-white hover:bg-white/10 transition-all pointer-events-auto">
+                        <ChevronLeft size={32} strokeWidth={2} />
+                    </button>
+                    <button onClick={handleNext} className="p-5 bg-white/5 backdrop-blur-2xl border border-white/10 rounded-full text-white/30 hover:text-white hover:bg-white/10 transition-all pointer-events-auto">
+                        <ChevronRight size={32} strokeWidth={2} />
+                    </button>
+                </div>
 
-            {/* --- Mobile View: Static Card with Dynamic Content (Fade Effect) --- */}
-            <div className="block md:hidden">
-              <div className="relative h-[40rem] w-full bg-theme-secondary/60 backdrop-blur-xl rounded-3xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] border border-white/10 overflow-hidden">
-                {/* Static Frame Decoration */}
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-violet-500 to-transparent opacity-50 z-20"></div>
+                {/* THE 5-SLOT STACK */}
+                <div className="relative w-full h-full flex items-center justify-center pointer-events-none">
+                {allProjects.map((project, index) => {
+                    let offset = index - centerIndex;
+                    if (offset > total / 2) offset -= total;
+                    if (offset < -total / 2) offset += total;
 
-                <Swiper
-                  effect="fade"
-                  fadeEffect={{ crossFade: true }}
-                  grabCursor={true}
-                  loop={projects.length > 1}
-                  autoplay={{
-                    delay: 4000,
-                    disableOnInteraction: false,
-                    pauseOnMouseEnter: true,
-                  }}
-                  pagination={{ clickable: true, dynamicBullets: true }}
-                  modules={[EffectFade, Pagination, Autoplay]}
-                  className="h-full w-full"
-                >
-                  {projects.map((project, index) => (
-                    <SwiperSlide
-                      key={project.id || index}
-                      className="h-full flex flex-col bg-theme-primary"
+                    if (Math.abs(offset) > 2) return null;
+
+                    const style = getSlotStyle(offset);
+                    const isCenter = offset === 0;
+
+                    return (
+                    <div
+                        key={project.id}
+                        className={`absolute transition-all duration-1000 ease-in-out border border-white/10 rounded-[3rem] bg-[#0d0d0d] overflow-hidden group/item pointer-events-auto ${isCenter ? 'shadow-[0_80px_160px_rgba(0,0,0,1)]' : 'shadow-2xl'}`}
+                        style={style}
                     >
-                      {/* Top Half: Image */}
-                      <div className="relative h-1/2 overflow-hidden">
-                        <img
-                          src={project.image_url || 'https://via.placeholder.com/800x400/7C3AED/FFFFFF?text=Project'}
-                          alt={project.title}
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent opacity-90"></div>
-                        <div className="absolute top-4 right-4 bg-black/40 backdrop-blur-md px-3 py-1 rounded-full text-xs font-mono text-violet-300 border border-violet-500/30 z-10">
-                          {(project.technologies && project.technologies[0]) || 'Dev'}
+                        <div className="w-full h-full relative z-10">
+                           <ProjectSlotContent project={project} isCenter={isCenter} />
                         </div>
-                      </div>
-
-                      {/* Bottom Half: Content */}
-                      <div className="h-1/2 p-6 flex flex-col relative bg-theme-secondary">
-                        {/* Floating Card for Title */}
-                        <div className="bg-theme-secondary/80 backdrop-blur-lg p-5 rounded-2xl shadow-lg border border-white/5 -mt-16 relative z-10 mb-4">
-                          <h3 className="text-2xl font-bold text-theme-primary mb-2 tracking-wide">
-                            {project.title}
-                          </h3>
-                          <p className="text-theme-secondary text-sm leading-relaxed line-clamp-3">
-                            {project.description}
-                          </p>
-                        </div>
-
-                        <div className="mt-auto">
-                          {/* Tech Stack */}
-                          <div className="flex flex-wrap gap-2 mb-6 justify-center">
-                            {(project.technologies || []).slice(0, 3).map((tech, i) => (
-                              <span
-                                key={i}
-                                className="px-2 py-1 bg-theme-secondary/50 text-theme-secondary rounded-full text-xs font-medium border border-gray-700"
-                              >
-                                {tech}
-                              </span>
-                            ))}
-                            {(project.technologies || []).length > 3 && (
-                              <span className="px-2 py-1 text-gray-400 text-xs">
-                                +{(project.technologies || []).length - 3}
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Buttons */}
-                          <div className="grid grid-cols-3 gap-3">
-                            <a
-                              href={project.demo_url || '#'}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className={`flex items-center justify-center py-2.5 bg-violet-600 text-white rounded-lg font-bold text-sm shadow-lg ${!project.demo_url ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                              Demo
-                            </a>
-                            <a
-                              href={project.project_url || '#'}
-                              className="flex items-center justify-center py-2.5 bg-gray-800 text-white rounded-lg font-semibold text-sm border border-gray-700"
-                            >
-                              Voir
-                            </a>
-                            <a
-                              href={project.repo_url || '#'}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className={`flex items-center justify-center py-2.5 bg-transparent text-gray-300 rounded-lg font-semibold text-sm border border-gray-700 ${!project.repo_url ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                              Code
-                            </a>
-                          </div>
-                        </div>
-                      </div>
-                    </SwiperSlide>
-                  ))}
-                </Swiper>
-              </div>
+                    </div>
+                    );
+                })}
+                </div>
             </div>
-          </>
+
+            {/* DYNAMIC PROGRESS BAR */}
+            <div className="flex items-center gap-6 z-[120]">
+                {allProjects.map((_, i) => (
+                    <button 
+                        key={i} 
+                        onClick={() => setCenterIndex(i)}
+                        className={`h-1.5 transition-all duration-1000 rounded-full relative ${centerIndex === i ? 'w-16 bg-violet-600 shadow-[0_0_20px_rgba(124,58,237,0.5)]' : 'w-6 bg-white/10 hover:bg-white/30'}`}
+                    >
+                        {centerIndex === i && <span className="absolute inset-0 bg-white/20 rounded-full animate-pulse"></span>}
+                    </button>
+                ))}
+            </div>
+          </div>
         )}
       </div>
     </section>
+  );
+};
+
+// 💎 MODERN STUDIO LAYOUT
+const ProjectSlotContent = ({ project, isCenter }) => {
+  const isEn = project.id === 'static-ethernanos';
+  
+  return (
+    <div className="grid grid-cols-12 w-full h-full bg-[#0d0d0d]">
+       <div className={`col-span-12 md:col-span-5 p-10 lg:p-12 flex flex-col justify-start space-y-6 bg-[#0d0d0d] relative z-20`}>
+          <div className="space-y-4">
+                {isEn && <span className="text-amber-500 text-[8px] font-black uppercase tracking-widest bg-amber-500/10 px-3 py-1 border border-amber-500/20 rounded-full inline-block mb-2">Director's Choice</span>}
+                <h3 className={`font-black leading-[1.1] tracking-tighter transition-all duration-700 ${isCenter ? 'text-xl lg:text-2xl text-white' : 'text-lg text-white/20'} ${isEn && isCenter ? '!text-amber-400' : ''}`}>
+                {project.title}
+                </h3>
+          </div>
+          
+          <div className="min-h-[100px] flex items-start">
+            <p className={`text-gray-400 text-[10px] lg:text-xs line-clamp-4 leading-relaxed font-medium transition-opacity duration-700 ${isCenter ? 'opacity-100' : 'opacity-0'}`}>
+                {project.description}
+            </p>
+          </div>
+
+          <div className={`flex flex-wrap gap-2.5 transition-all duration-700 ${isCenter ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}>
+            {project.technologies && project.technologies.slice(0, 5).map(t => (
+            <span 
+                key={t} 
+                className={`px-3.5 py-1.5 border border-white/10 rounded-lg text-[7.5px] text-gray-300 uppercase font-black bg-white/5 tracking-wider transition-all duration-300 pointer-events-auto ${isEn ? 'hover:shadow-[3px_3px_9px_rgba(245,158,11,0.35)] hover:border-amber-500/30' : 'hover:shadow-[3px_3px_9px_rgba(139,92,246,0.25)] hover:border-violet-500/30'} hover:-translate-y-0.5`}
+            >
+                {t}
+            </span>
+            ))}
+          </div>
+       </div>
+
+       <div className="hidden md:block col-span-7 relative h-full bg-[#0d0d0d] overflow-hidden">
+          <div className="absolute inset-0 z-10 transition-all duration-[2000ms]">
+            <img src={project.image_url} alt="" className={`w-full h-full object-cover transition-opacity duration-1000 ${isCenter ? 'opacity-100' : 'opacity-20 grayscale'}`} />
+          </div>
+          <div className="absolute inset-0 z-20 bg-gradient-to-r from-[#0d0d0d] via-transparent to-transparent -ml-[4px]"></div>
+
+          <div className={`absolute bottom-10 left-10 right-10 z-30 flex items-center gap-6 transition-all duration-1000 ${isCenter ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8 pointer-events-none'}`}>
+             <Link to={isEn ? "/ethernanos" : project.project_url} className={`flex-1 text-center py-3.5 rounded-full font-black text-[9px] uppercase tracking-widest transition-all duration-300 ${isEn ? 'bg-amber-500 text-black shadow-[0_0_40px_rgba(245,158,11,0.3)] hover:bg-violet-600 hover:text-white hover:shadow-violet-600/40' : 'bg-white text-black hover:bg-violet-600 hover:text-white hover:shadow-violet-600/40 shadow-xl'}`}>
+                EXPLORER <ArrowRight className="inline-block ml-2" size={14} />
+             </Link>
+             <a href={project.repo_url} className="p-3 bg-white/5 backdrop-blur-xl border border-white/10 rounded-full text-white/50 hover:text-white transition-all transform hover:scale-110 shadow-lg group">
+                <Github size={18} className="group-hover:rotate-12 transition-transform" />
+             </a>
+          </div>
+       </div>
+    </div>
+  );
+};
+
+const ProjectCard = ({ project }) => {
+  const isEn = project.id === 'static-ethernanos';
+  return (
+    <div className={`group relative flex flex-col bg-[#111] border border-white/5 rounded-[2.5rem] overflow-hidden transition-all duration-500 hover:border-violet-500/30 ${isEn ? 'border-amber-500/20' : ''}`}>
+      <div className="aspect-video relative overflow-hidden">
+        <img src={project.image_url} alt={project.title} className="w-full h-full object-cover grayscale-[30%] group-hover:grayscale-0 transition-transform duration-1000 group-hover:scale-110" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#111] to-transparent"></div>
+      </div>
+      <div className="p-10">
+        <h3 className={`text-xl font-bold mb-4 ${isEn ? 'text-amber-400' : 'text-white'}`}>{project.title}</h3>
+        <p className="text-gray-400 text-base line-clamp-2 mb-8">{project.description}</p>
+        <div className="flex flex-wrap gap-2 mb-8">
+            {project.technologies && project.technologies.slice(0, 3).map(t => (
+                <span key={t} className="px-3 py-1 border border-white/5 rounded-lg text-[7px] text-gray-500 uppercase font-black bg-white/5">{t}</span>
+            ))}
+        </div>
+        <div className="flex items-center gap-6">
+          <Link to={isEn ? "/ethernanos" : project.project_url} className={`flex-1 text-center py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${isEn ? 'bg-amber-500 text-black shadow-lg hover:bg-violet-600 hover:text-white' : 'bg-white text-black hover:bg-violet-600 hover:text-white'}`}>
+            Explore
+          </Link>
+          <a href={project.repo_url} className="p-3.5 border border-white/5 rounded-2xl text-gray-500 hover:text-white transition-colors">
+            <Github size={22} />
+          </a>
+        </div>
+      </div>
+    </div>
   );
 };
 

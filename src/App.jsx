@@ -30,7 +30,9 @@ import EducationManager from './pages/Admin/EducationManager';
 import SkillManager from './pages/Admin/SkillManager';
 import SocialManager from './pages/Admin/SocialManager';
 import MessagesManager from './pages/Admin/MessagesManager';
+import ProjectStoreManager from './pages/Admin/ProjectStore/ProjectStoreManager';
 import ProtectedRoute from './components/ProtectedRoute';
+import EthernanosDetail from './pages/EthernanosDetail';
 
 // Public Portfolio Layout
 const Portfolio = () => {
@@ -113,6 +115,7 @@ function App() {
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<Portfolio />} />
+        <Route path="/ethernanos" element={<EthernanosDetail />} />
 
         {/* Admin Routes */}
         <Route path="/admin/login" element={<Login />} />
@@ -127,6 +130,7 @@ function App() {
         >
           <Route index element={<Dashboard />} />
           <Route path="projects" element={<ProjectManager />} />
+          <Route path="project-store" element={<ProjectStoreManager />} />
           <Route path="experience" element={<ExperienceManager />} />
           <Route path="education" element={<EducationManager />} />
           <Route path="skills" element={<SkillManager />} />
