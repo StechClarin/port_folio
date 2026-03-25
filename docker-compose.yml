@@ -1,0 +1,15 @@
+services:
+  portfolio:
+    container_name: stech-portfolio
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8090:80"
+    restart: always
+    environment:
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+      - VITE_RELEASE_BASE_URL=${VITE_RELEASE_BASE_URL}
+      - VITE_HUB_API_KEY=${VITE_HUB_API_KEY}
+      - VITE_SCHOOL_MANAGE_API_URL=${VITE_SCHOOL_MANAGE_API_URL}
