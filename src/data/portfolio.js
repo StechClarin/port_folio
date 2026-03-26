@@ -3,24 +3,27 @@ export const portfolioData = {
     name: 'John Doe', // Placeholder, replace with actual name if known or leave generic
     role: 'Full Stack Developer',
     bio: "Développeur passionné avec plus de 5 années d'expérience dans le développement web et les opérations DevOps. Spécialisé dans la création d'applications web robustes et scalables avec les technologies modernes, en particulier React, Node.js et les services cloud. Mon objectif est de transformer des idées complexes en solutions logicielles élégantes et performantes.",
+    bio_en: "Passionate developer with over 5 years of experience in web development and DevOps. Specialized in building robust and scalable web applications with modern technologies, especially React, Node.js, and cloud services. My goal is to transform complex ideas into elegant and high-performance software solutions.",
     photoUrl:
       'https://via.placeholder.com/300x300/6A0DAD/FFFFFF?text=Votre+Photo',
-    resumeUrl: '/path-to-cv.pdf',
+    resumeUrl: '/cv-fr.pdf',
+    resumeUrl_en: '/cv-en.pdf',
     education: [
       {
         id: 1,
-        degree:
-          "Master's Degree in Software Engineering and Information Systems",
-        school: 'University Name',
-        location: 'City, Country',
-        year: 'Year of Graduation',
+        degree: "Master en Ingénierie Logicielle et Systèmes d'Information",
+        degree_en: "Master's Degree in Software Engineering and Information Systems",
+        school: 'Université Gaston Berger',
+        location: 'Saint-Louis, Sénégal',
+        year: '2023',
       },
       {
         id: 2,
-        degree: "Bachelor's Degree in Management Information Systems",
-        school: 'University Name',
-        location: 'City, Country',
-        year: 'Year of Graduation',
+        degree: "Licence en Informatique de Gestion",
+        degree_en: "Bachelor's Degree in Management Information Systems",
+        school: 'Université Gaston Berger',
+        location: 'Saint-Louis, Sénégal',
+        year: '2021',
       },
     ],
   },

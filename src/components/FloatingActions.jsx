@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Mail, MessageCircle, ArrowUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion'; // eslint-disable-line no-unused-vars
 
+import { useLanguage } from '../context/LanguageContext';
+
 const FloatingActions = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
+  const { language, toggleLanguage } = useLanguage();
 
   // Calculate scroll progress
   const calculateScrollProgress = () => {
@@ -37,6 +40,15 @@ const FloatingActions = () => {
   }, []);
 
   const actions = [
+    {
+      icon: <span className="text-lg leading-none">{language === 'fr' ? '🇬🇧' : '🇫🇷'}</span>,
+      label: language === 'fr' ? 'Switch to English' : 'Passer au Français',
+      onClick: toggleLanguage,
+      color: 'bg-white/10 backdrop-blur-md border border-white/20',
+      hoverColor: 'hover:bg-white/20',
+      textColor: 'text-white',
+      size: 'p-2', // Smaller padding
+    },
     {
       icon: <Mail size={20} />,
       label: 'Email',
@@ -78,7 +90,7 @@ const FloatingActions = () => {
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={action.onClick}
-                className={`p-3 rounded-full shadow-lg transition-all duration-300 ${action.color} ${action.hoverColor} ${action.textColor} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-violet-500`}
+                className={`flex items-center justify-center rounded-full shadow-lg transition-all duration-300 ${action.size || 'p-3'} ${action.color} ${action.hoverColor} ${action.textColor} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-violet-500`}
                 title={action.label}
                 aria-label={action.label}
               >

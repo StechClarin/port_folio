@@ -1,12 +1,21 @@
 import React, { useState } from 'react';
 import { Menu, X } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const { language } = useLanguage();
 
   const toggleMenu = () => {
     setIsOpen(!isOpen);
   };
+
+  const navLinks = [
+    { href: '#projects', label: language === 'fr' ? 'Projets' : 'Projects' },
+    { href: '#experience', label: language === 'fr' ? 'Expérience' : 'Experience' },
+    { href: '#skills', label: language === 'fr' ? 'Compétences' : 'Skills' },
+    { href: '#about', label: language === 'fr' ? 'À propos' : 'About' },
+  ];
 
   return (
     <nav className="fixed top-0 left-0 right-0 bg-theme-secondary/80 backdrop-blur-md border-b border-violet-800/20 z-50 transition-all duration-300">
@@ -14,37 +23,22 @@ const Navbar = () => {
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
           <div className="text-theme-primary text-2xl font-bold tracking-wider [text-shadow:0_0_15px_rgba(124,58,237,0.5)] cursor-pointer hover:text-violet-400 transition-colors">
-            Mon <span className="text-violet-500">Portfolio</span>
+            {language === 'fr' ? 'Mon' : 'My'} <span className="text-violet-500">Portfolio</span>
           </div>
 
           {/* Desktop Menu */}
           <div className="hidden md:flex items-center space-x-8">
+            {navLinks.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                className="text-theme-secondary hover:text-theme-primary hover:text-shadow-glow transition-all text-sm font-medium tracking-wide"
+              >
+                {link.label}
+              </a>
+            ))}
             <a
-              href="#projects"
-              className="text-theme-secondary hover:text-theme-primary hover:text-shadow-glow transition-all text-sm font-medium tracking-wide"
-            >
-              Projets
-            </a>
-            <a
-              href="#experience"
-              className="text-theme-secondary hover:text-theme-primary hover:text-shadow-glow transition-all text-sm font-medium tracking-wide"
-            >
-              Expérience
-            </a>
-            <a
-              href="#skills"
-              className="text-theme-secondary hover:text-theme-primary hover:text-shadow-glow transition-all text-sm font-medium tracking-wide"
-            >
-              Compétences
-            </a>
-            <a
-              href="#about"
-              className="text-theme-secondary hover:text-theme-primary hover:text-shadow-glow transition-all text-sm font-medium tracking-wide"
-            >
-              À propos
-            </a>
-            <a
-              href="/path-to-cv.pdf"
+              href={language === 'fr' ? '/StechClarin_CV-fr.pdf' : '/StechClarin_CV-en.pdf'}
               target="_blank"
               rel="noopener noreferrer"
               className="px-6 py-2.5 bg-gradient-to-r from-violet-600 to-violet-800 text-white rounded-full hover:scale-105 transition-all shadow-[0_0_15px_rgba(124,58,237,0.4)] text-sm font-semibold tracking-wide border border-violet-500/30"
@@ -75,42 +69,24 @@ const Navbar = () => {
         }`}
       >
         <div className="px-6 py-8 flex flex-col space-y-6">
+          {navLinks.map((link) => (
+            <a
+              key={link.href}
+              href={link.href}
+              onClick={toggleMenu}
+              className="text-theme-secondary hover:text-violet-400 text-lg font-medium tracking-wide border-b border-violet-800/10 pb-2"
+            >
+              {link.label}
+            </a>
+          ))}
           <a
-            href="#projects"
-            onClick={toggleMenu}
-            className="text-theme-secondary hover:text-violet-400 text-lg font-medium tracking-wide border-b border-violet-800/10 pb-2"
-          >
-            Projets
-          </a>
-          <a
-            href="#experience"
-            onClick={toggleMenu}
-            className="text-theme-secondary hover:text-violet-400 text-lg font-medium tracking-wide border-b border-violet-800/10 pb-2"
-          >
-            Expérience
-          </a>
-          <a
-            href="#skills"
-            onClick={toggleMenu}
-            className="text-theme-secondary hover:text-violet-400 text-lg font-medium tracking-wide border-b border-violet-800/10 pb-2"
-          >
-            Compétences
-          </a>
-          <a
-            href="#about"
-            onClick={toggleMenu}
-            className="text-theme-secondary hover:text-violet-400 text-lg font-medium tracking-wide border-b border-violet-800/10 pb-2"
-          >
-            À propos
-          </a>
-          <a
-            href="/path-to-cv.pdf"
+            href={language === 'fr' ? '/StechClarin_CV-fr.pdf' : '/StechClarin_CV-en.pdf'}
             target="_blank"
             rel="noopener noreferrer"
             onClick={toggleMenu}
             className="text-center px-6 py-3 bg-violet-700 text-white rounded-xl font-bold shadow-lg mt-4"
           >
-            Télécharger mon CV
+            {language === 'fr' ? 'Télécharger mon CV' : 'Download my CV'}
           </a>
         </div>
       </div>
