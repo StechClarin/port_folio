@@ -1,9 +1,11 @@
 import React from 'react';
 import { GraduationCap } from 'lucide-react';
 import { usePortfolioData } from '../hooks/usePortfolioData';
+import { useLanguage } from '../context/LanguageContext';
 
 const Education = () => {
   const { education, loading } = usePortfolioData();
+  const { language } = useLanguage();
 
   if (loading) return null;
 
@@ -13,7 +15,7 @@ const Education = () => {
       <div className="relative z-10 max-w-7xl mx-auto px-6">
         <div className="relative flex justify-center items-center mb-12">
           <h2 className="text-3xl md:text-5xl font-extrabold text-white tracking-wider [text-shadow:0_0_25px_#7C3AED,0_0_10px_#4C1D95] text-center">
-            Education
+            {language === 'fr' ? 'Formation' : 'Education'}
           </h2>
           <GraduationCap className="absolute right-0 md:right-20 top-0 w-12 h-12 text-violet-500 animate-bounce" />
         </div>
@@ -33,7 +35,7 @@ const Education = () => {
               </div>
               <div className="order-1 bg-gray-800 rounded-lg shadow-[0_0_30px_rgba(124,58,237,0.3)] border border-purple-800/40 w-full md:w-5/12 px-6 py-4 transform hover:scale-105 transition-transform duration-300">
                 <h3 className="mb-3 font-bold text-violet-400 text-xl flex justify-between items-start">
-                  {edu.degree}
+                  {language === 'fr' ? edu.degree : (edu.degree_en || edu.degree)}
                   <span className="md:hidden text-xs bg-purple-900/50 text-purple-200 px-2 py-1 rounded-full border border-purple-700/50">
                     #{index + 1}
                   </span>
@@ -47,7 +49,7 @@ const Education = () => {
 
           {education.length === 0 && (
             <div className="text-center text-gray-400 mt-10">
-              Aucune formation ajoutée pour le moment.
+              {language === 'fr' ? 'Aucune formation ajoutée pour le moment.' : 'No education entries added yet.'}
             </div>
           )}
         </div>

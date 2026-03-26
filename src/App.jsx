@@ -97,7 +97,7 @@ const Portfolio = () => {
           </SectionWrapper>
         </main>
 
-        <footer className="mt-24 bg-theme-primary border-t border-violet-800/20">
+        <footer id="contact" className="mt-24 bg-theme-primary border-t border-violet-800/20">
           <Footer />
         </footer>
       </div>
@@ -108,39 +108,43 @@ const Portfolio = () => {
   );
 };
 
+import { LanguageProvider } from './context/LanguageContext';
+
 function App() {
   return (
-    <Router>
-      <Toaster position="top-right" />
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={<Portfolio />} />
-        <Route path="/ethernanos" element={<EthernanosDetail />} />
+    <LanguageProvider>
+      <Router>
+        <Toaster position="top-right" />
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/" element={<Portfolio />} />
+          <Route path="/ethernanos" element={<EthernanosDetail />} />
 
-        {/* Admin Routes */}
-        <Route path="/admin/login" element={<Login />} />
+          {/* Admin Routes */}
+          <Route path="/admin/login" element={<Login />} />
 
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute>
-              <AdminLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Dashboard />} />
-          <Route path="projects" element={<ProjectManager />} />
-          <Route path="project-store" element={<ProjectStoreManager />} />
-          <Route path="experience" element={<ExperienceManager />} />
-          <Route path="education" element={<EducationManager />} />
-          <Route path="skills" element={<SkillManager />} />
-          <Route path="socials" element={<SocialManager />} />
-          <Route path="messages" element={<MessagesManager />} />
-          {/* Add other admin routes here later */}
-          <Route path="*" element={<Navigate to="/admin" replace />} />
-        </Route>
-      </Routes>
-    </Router>
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute>
+                <AdminLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<Dashboard />} />
+            <Route path="projects" element={<ProjectManager />} />
+            <Route path="project-store" element={<ProjectStoreManager />} />
+            <Route path="experience" element={<ExperienceManager />} />
+            <Route path="education" element={<EducationManager />} />
+            <Route path="skills" element={<SkillManager />} />
+            <Route path="socials" element={<SocialManager />} />
+            <Route path="messages" element={<MessagesManager />} />
+            {/* Add other admin routes here later */}
+            <Route path="*" element={<Navigate to="/admin" replace />} />
+          </Route>
+        </Routes>
+      </Router>
+    </LanguageProvider>
   );
 }
 
