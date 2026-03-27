@@ -15,7 +15,7 @@ export const portfolioData = {
         degree_en: "Master's Degree in Software Engineering and Information Systems",
         school: 'Université Cheikh Anta Diop ',
         location: 'Dakar, Sénégal',
-        year: '2023-2025',
+        year: '',
       },
       {
         id: 2,
@@ -23,7 +23,7 @@ export const portfolioData = {
         degree_en: "Bachelor's Degree in Management Information Systems",
         school: 'Université Catholique de l\'Afrique de l\'Ouest ',
         location: 'Dakar, Sénégal',
-        year: '2019-2022',
+        year: '',
       },
     ],
   },
