@@ -47,7 +47,7 @@ const Projects = () => {
       ? "Système d'exploitation décentralisé pour applications métier. Haute performance, architecture Rust/Tauri et synchronisation temps-réel sécurisée."
       : "Decentralized operating system for business applications. High performance, Rust/Tauri architecture, and secure real-time synchronization.",
     image_url: logoEthernanos,
-    technologies: ['Rust', 'Tauri', 'Angular', 'PostgreSQL', 'C++'],
+    technologies: ['Rust', 'Tauri', 'Angular', 'PostgreSQL'],
     project_url: '/ethernanos',
     demo_url: null,
     repo_url: 'https://github.com/stechclarin/ethernanos-launcher'
