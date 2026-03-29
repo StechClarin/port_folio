@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Upload, HardDrive, Filter, Clock, CheckCircle2, AlertCircle, Copy, DownloadCloud, FileArchive, Save, Shield, Loader2, RefreshCw } from 'lucide-react';
+import { Upload, HardDrive, Filter, Clock, CheckCircle2, AlertCircle, Copy, DownloadCloud, FileArchive, Save, Shield, Loader2, RefreshCw, Edit } from 'lucide-react';
 import StoreModal from './StoreModal';
 import { supabase } from '../../../../lib/supabaseClient';
 import toast from 'react-hot-toast';
@@ -12,6 +12,7 @@ const ReleasesTab = () => {
   
   const [filterApp, setFilterApp] = useState('All');
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [editingRelease, setEditingRelease] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [newRelease, setNewRelease] = useState({ 
     appId: '', 
@@ -96,7 +97,7 @@ const ReleasesTab = () => {
     }
   };
 
-  const handleCreateRelease = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!newRelease.appId || !newRelease.version || !newRelease.downloadUrl || !newRelease.checksum) {
       toast.error('Please fill all required fields');
@@ -105,32 +106,73 @@ const ReleasesTab = () => {
 
     setIsSubmitting(true);
     try {
-      const { data, error } = await supabase
-        .from('app_releases')
-        .insert([{
-          app_id: newRelease.appId,
-          version: newRelease.version,
-          download_url: newRelease.downloadUrl,
-          checksum: newRelease.checksum,
-          size_bytes: newRelease.sizeMB ? parseInt(newRelease.sizeMB) * 1024 * 1024 : 0,
-          is_active: true,
-          released_at: new Date().toISOString()
-        }])
-        .select('*, apps(name)')
-        .single();
+      if (editingRelease) {
+        // UPDATE
+        const { data, error } = await supabase
+          .from('app_releases')
+          .update({
+            app_id: newRelease.appId,
+            version: newRelease.version,
+            download_url: newRelease.downloadUrl,
+            checksum: newRelease.checksum,
+            size_bytes: newRelease.sizeMB ? parseInt(newRelease.sizeMB) * 1024 * 1024 : 0,
+          })
+          .eq('id', editingRelease.id)
+          .select('*, apps(name)')
+          .single();
 
-      if (error) throw error;
+        if (error) throw error;
+        setReleases(releases.map(r => r.id === editingRelease.id ? data : r));
+        toast.success('Release updated successfully!');
+      } else {
+        // CREATE
+        const { data, error } = await supabase
+          .from('app_releases')
+          .insert([{
+            app_id: newRelease.appId,
+            version: newRelease.version,
+            download_url: newRelease.downloadUrl,
+            checksum: newRelease.checksum,
+            size_bytes: newRelease.sizeMB ? parseInt(newRelease.sizeMB) * 1024 * 1024 : 0,
+            is_active: true,
+            released_at: new Date().toISOString()
+          }])
+          .select('*, apps(name)')
+          .single();
 
-      setReleases([data, ...releases]);
+        if (error) throw error;
+        setReleases([data, ...releases]);
+        toast.success('Release published successfully!');
+      }
+
       setIsUploadModalOpen(false);
-      setNewRelease({ appId: apps[0]?.id || '', version: '', downloadUrl: '', checksum: '', sizeMB: '' });
-      toast.success('Release published successfully!');
+      setEditingRelease(null);
+      setNewRelease({ appId: apps[0]?.id || '', version: '', downloadUrl: '', checksum: '', sizeMB: '', metadataUrl: '' });
     } catch (err) {
-      console.error('Error creating release:', err);
-      toast.error(err.message || 'Failed to create release');
+      console.error('Error saving release:', err);
+      toast.error(err.message || 'Failed to save release');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleEditClick = (release) => {
+    setEditingRelease(release);
+    setNewRelease({
+      appId: release.app_id,
+      version: release.version,
+      downloadUrl: release.download_url,
+      checksum: release.checksum,
+      sizeMB: release.size_bytes ? Math.round(release.size_bytes / 1024 / 1024).toString() : '',
+      metadataUrl: ''
+    });
+    setIsUploadModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsUploadModalOpen(false);
+    setEditingRelease(null);
+    setNewRelease({ appId: apps[0]?.id || '', version: '', downloadUrl: '', checksum: '', sizeMB: '', metadataUrl: '' });
   };
 
   const handleToggleReleaseStatus = async (releaseId, currentStatus) => {
@@ -284,7 +326,6 @@ const ReleasesTab = () => {
                         </td>
                          <td className="px-6 py-4 whitespace-nowrap text-right">
                             <div className="flex items-center justify-end gap-3 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                               {/* Action buttons removed: download is handled by the Hub */}
                               {release.is_active ? (
                                  <button onClick={() => handleToggleReleaseStatus(release.id, release.is_active)} className="text-xs px-3 py-1.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 rounded-lg transition-colors font-medium">
                                     Deactivate
@@ -314,10 +355,10 @@ const ReleasesTab = () => {
       {/* Upload Release Modal */}
       <StoreModal 
         isOpen={isUploadModalOpen} 
-        onClose={() => setIsUploadModalOpen(false)} 
-        title="Upload New Release"
+        onClose={handleCloseModal} 
+        title={editingRelease ? "Edit Release" : "Upload New Release"}
       >
-        <form className="space-y-4" onSubmit={handleCreateRelease}>
+        <form className="space-y-4" onSubmit={handleSubmit}>
            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">Target Application</label>
@@ -412,14 +453,14 @@ const ReleasesTab = () => {
            </div>
            
            <div className="pt-4 flex justify-end gap-3 border-t border-gray-800 mt-6">
-              <button type="button" onClick={() => setIsUploadModalOpen(false)} className="px-5 py-2.5 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition">Cancel</button>
+              <button type="button" onClick={handleCloseModal} className="px-5 py-2.5 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition">Cancel</button>
               <button 
                 type="submit" 
                 disabled={isSubmitting}
                 className="px-5 py-2.5 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition flex items-center gap-2 disabled:opacity-50"
               >
                  {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                 {isSubmitting ? 'Publishing...' : 'Publish Release'}
+                 {isSubmitting ? (editingRelease ? 'Saving...' : 'Publishing...') : (editingRelease ? 'Save Changes' : 'Publish Release')}
               </button>
            </div>
         </form>
