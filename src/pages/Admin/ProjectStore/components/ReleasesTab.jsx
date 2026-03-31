@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Upload, HardDrive, Filter, Clock, CheckCircle2, AlertCircle, Copy, DownloadCloud, FileArchive, Save, Shield, Loader2, RefreshCw, Edit } from 'lucide-react';
+import { Upload, HardDrive, Filter, Clock, CheckCircle2, AlertCircle, Copy, DownloadCloud, FileArchive, Save, Shield, Loader2, RefreshCw, Edit, Menu, Trash2, Power, PowerOff } from 'lucide-react';
 import StoreModal from './StoreModal';
 import { supabase } from '../../../../lib/supabaseClient';
 import toast from 'react-hot-toast';
@@ -14,13 +14,15 @@ const ReleasesTab = () => {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [editingRelease, setEditingRelease] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [openDropdownId, setOpenDropdownId] = useState(null);
   const [newRelease, setNewRelease] = useState({ 
     appId: '', 
     version: '', 
     metadataUrl: '',
     downloadUrl: '',
     checksum: '',
-    sizeMB: ''
+    sizeMB: '',
+    platform: 'windows-latest'
   });
   
   const fetchData = useCallback(async () => {
@@ -85,7 +87,8 @@ const ReleasesTab = () => {
         ...prev,
         version: data.version || prev.version,
         checksum: data.hash || prev.checksum,
-        downloadUrl: computedDownloadUrl || prev.downloadUrl
+        downloadUrl: computedDownloadUrl || prev.downloadUrl,
+        platform: data.os || prev.platform
       }));
 
       toast.success('Métadonnées récupérées avec succès !');
@@ -116,6 +119,7 @@ const ReleasesTab = () => {
             download_url: newRelease.downloadUrl,
             checksum: newRelease.checksum,
             size_bytes: newRelease.sizeMB ? parseInt(newRelease.sizeMB) * 1024 * 1024 : 0,
+            platform: newRelease.platform,
           })
           .eq('id', editingRelease.id)
           .select('*, apps(name)')
@@ -134,6 +138,7 @@ const ReleasesTab = () => {
             download_url: newRelease.downloadUrl,
             checksum: newRelease.checksum,
             size_bytes: newRelease.sizeMB ? parseInt(newRelease.sizeMB) * 1024 * 1024 : 0,
+            platform: newRelease.platform,
             is_active: true,
             released_at: new Date().toISOString()
           }])
@@ -147,7 +152,7 @@ const ReleasesTab = () => {
 
       setIsUploadModalOpen(false);
       setEditingRelease(null);
-      setNewRelease({ appId: apps[0]?.id || '', version: '', downloadUrl: '', checksum: '', sizeMB: '', metadataUrl: '' });
+      setNewRelease({ appId: apps[0]?.id || '', version: '', downloadUrl: '', checksum: '', sizeMB: '', metadataUrl: '', platform: 'windows-latest' });
     } catch (err) {
       console.error('Error saving release:', err);
       toast.error(err.message || 'Failed to save release');
@@ -164,7 +169,8 @@ const ReleasesTab = () => {
       downloadUrl: release.download_url,
       checksum: release.checksum,
       sizeMB: release.size_bytes ? Math.round(release.size_bytes / 1024 / 1024).toString() : '',
-      metadataUrl: ''
+      metadataUrl: '',
+      platform: release.platform || 'windows-latest'
     });
     setIsUploadModalOpen(true);
   };
@@ -172,7 +178,7 @@ const ReleasesTab = () => {
   const handleCloseModal = () => {
     setIsUploadModalOpen(false);
     setEditingRelease(null);
-    setNewRelease({ appId: apps[0]?.id || '', version: '', downloadUrl: '', checksum: '', sizeMB: '', metadataUrl: '' });
+    setNewRelease({ appId: apps[0]?.id || '', version: '', downloadUrl: '', checksum: '', sizeMB: '', metadataUrl: '', platform: 'windows-latest' });
   };
 
   const handleToggleReleaseStatus = async (releaseId, currentStatus) => {
@@ -197,6 +203,20 @@ const ReleasesTab = () => {
     });
   };
 
+  const handleDeleteRelease = async (releaseId) => {
+    confirmAction('Voulez-vous vraiment supprimer définitivement cette release ? Cette action est irréversible.', async () => {
+      try {
+        const { error } = await supabase.from('app_releases').delete().eq('id', releaseId);
+        if (error) throw error;
+        setReleases(releases.filter(r => r.id !== releaseId));
+        toast.success('Release supprimée avec succès');
+      } catch (err) {
+        console.error(err);
+        toast.error('Erreur lors de la suppression de la release');
+      }
+    });
+  };
+
   const filteredReleases = filterApp === 'All' 
     ? releases 
     : releases.filter(r => r.app_id === filterApp);
@@ -217,7 +237,12 @@ const ReleasesTab = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Overlay click-outside for dropdown */}
+      {openDropdownId && (
+        <div className="fixed inset-0 z-40" onClick={() => setOpenDropdownId(null)}></div>
+      )}
+
       {/* Top Banner Actions */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-gray-900/40 p-4 rounded-xl border border-gray-700/50">
         <div className="flex items-center gap-4 w-full sm:w-auto">
@@ -308,6 +333,11 @@ const ReleasesTab = () => {
                               <span className="text-gray-500 mt-1">
                                  {new Date(release.released_at).toLocaleDateString()}
                               </span>
+                              {release.platform && (
+                                 <span className="text-violet-400 mt-1 uppercase text-[10px] tracking-wide font-semibold">
+                                     {release.platform.includes('ubuntu') || release.platform.includes('linux') ? '🐧 LINUX' : '🪟 WINDOWS'}
+                                 </span>
+                              )}
                            </div>
                         </td>
                         <td className="px-6 py-4">
@@ -324,17 +354,55 @@ const ReleasesTab = () => {
                               </button>
                            </div>
                         </td>
-                         <td className="px-6 py-4 whitespace-nowrap text-right">
-                            <div className="flex items-center justify-end gap-3 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                              {release.is_active ? (
-                                 <button onClick={() => handleToggleReleaseStatus(release.id, release.is_active)} className="text-xs px-3 py-1.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 rounded-lg transition-colors font-medium">
-                                    Deactivate
-                                 </button>
-                              ) : (
-                                 <button onClick={() => handleToggleReleaseStatus(release.id, release.is_active)} className="text-xs px-3 py-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-lg transition-colors font-medium">
-                                    Make Active
-                                 </button>
-                              )}
+                         <td className="px-6 py-4 whitespace-nowrap text-right relative">
+                            <div className="flex items-center justify-end relative">
+                               
+                               {/* Menu Content (Horizontal Icons) - Appears on Left of Trigger */}
+                               {openDropdownId === release.id && (
+                                  <div className="absolute right-12 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-gray-900 border border-gray-700 rounded-full shadow-xl px-1.5 py-1.5 z-[100] animate-in slide-in-from-right-2 fade-in duration-200 origin-right">
+                                     <button 
+                                        onClick={(e) => { e.stopPropagation(); handleEditClick(release); setOpenDropdownId(null); }}
+                                        className="p-2 rounded-full text-gray-400 hover:bg-violet-500/20 hover:text-violet-400 transition-colors"
+                                        title="Modifier"
+                                     >
+                                        <Edit size={16} />
+                                     </button>
+
+                                     <button 
+                                        onClick={(e) => { e.stopPropagation(); handleToggleReleaseStatus(release.id, release.is_active); setOpenDropdownId(null); }}
+                                        className="p-2 rounded-full text-gray-400 hover:bg-violet-500/20 hover:text-white transition-colors"
+                                        title={release.is_active ? "Désactiver" : "Activer"}
+                                     >
+                                        {release.is_active ? <PowerOff size={16} className="text-amber-500" /> : <Power size={16} className="text-emerald-500" />}
+                                     </button>
+
+                                     <div className="w-px h-5 bg-gray-700 mx-1"></div>
+
+                                     <button 
+                                        onClick={(e) => { e.stopPropagation(); handleDeleteRelease(release.id); setOpenDropdownId(null); }}
+                                        className="p-2 rounded-full text-gray-400 hover:bg-red-500/20 hover:text-red-400 transition-colors"
+                                        title="Supprimer"
+                                     >
+                                        <Trash2 size={16} />
+                                     </button>
+                                  </div>
+                               )}
+
+                               {/* Trigger Button - Student List Style */}
+                               <button 
+                                  onClick={(e) => {
+                                     e.stopPropagation();
+                                     setOpenDropdownId(openDropdownId === release.id ? null : release.id);
+                                  }}
+                                  className={`w-9 h-9 flex items-center justify-center rounded-full shadow-lg transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-violet-500/30 ${
+                                     openDropdownId === release.id 
+                                     ? 'bg-violet-700 text-white scale-105 ring-4 ring-violet-500/30' 
+                                     : 'bg-violet-600 text-white hover:bg-violet-700 hover:scale-105'
+                                  }`}
+                               >
+                                  <Menu size={18} />
+                               </button>
+
                            </div>
                         </td>
                      </tr>
@@ -359,7 +427,7 @@ const ReleasesTab = () => {
         title={editingRelease ? "Edit Release" : "Upload New Release"}
       >
         <form className="space-y-4" onSubmit={handleSubmit}>
-           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">Target Application</label>
                 <select value={newRelease.appId} onChange={e => setNewRelease({...newRelease, appId: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-violet-500 focus:border-violet-500 appearance-none">
@@ -372,6 +440,13 @@ const ReleasesTab = () => {
                 <label className="block text-sm font-medium text-gray-300 mb-1">Semantic Version</label>
                 <input type="text" required value={newRelease.version} onChange={e => setNewRelease({...newRelease, version: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white font-mono text-sm focus:ring-violet-500 focus:border-violet-500" placeholder="e.g. 1.0.0" />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">OS / Platform</label>
+                <select value={newRelease.platform} onChange={e => setNewRelease({...newRelease, platform: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-violet-500 focus:border-violet-500 appearance-none">
+                   <option value="windows-latest">Windows (.exe / .zip)</option>
+                   <option value="ubuntu-latest">Linux (.tar.gz)</option>
+                </select>
+              </div>
            </div>
            
            <div className="bg-violet-500/5 border border-violet-500/20 p-4 rounded-xl space-y-3">
@@ -381,15 +456,12 @@ const ReleasesTab = () => {
               </div>
               <div className="flex gap-2">
                  <div className="relative flex-1">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
-                       <RefreshCw size={14} className={isSubmitting ? "animate-spin" : ""} />
-                    </div>
                     <input 
-                       type="url" 
-                       value={newRelease.metadataUrl} 
-                       onChange={e => setNewRelease({...newRelease, metadataUrl: e.target.value})}
-                       className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 pl-9 text-xs text-white focus:ring-violet-500 focus:border-violet-500 font-mono" 
-                       placeholder="http://72.60.2.96:8080/.../metadata.json" 
+                      type="url" 
+                      placeholder="URL du fichier metadata.json"
+                      value={newRelease.metadataUrl || ''}
+                      onChange={e => setNewRelease({...newRelease, metadataUrl: e.target.value})}
+                      className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-white text-xs focus:ring-violet-500 focus:border-violet-500"
                     />
                  </div>
                  <button 
