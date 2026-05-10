@@ -120,8 +120,10 @@ const LicensesTab = () => {
               if (!apiUrl) throw new Error("L'URL de l'API Cloud (VITE_SCHOOL_MANAGE_API_URL) n'est pas configurée.");
               
               const apiKey = import.meta.env.VITE_HUB_API_KEY;
-        
-              const response = await fetch(`${apiUrl}/api/external/provision-tenant/`, {
+              const normalizedApiUrl = apiUrl.replace(/\/api\/?$/, '').replace(/\/+$/, '');
+              const hubId = customer.hub_id || customer.hubId || `ETH-NANOS-${customer.id.replace(/-/g, '').slice(0, 8).toUpperCase()}`;
+
+              const response = await fetch(`${normalizedApiUrl}/api/external/provision-tenant/`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -130,6 +132,7 @@ const LicensesTab = () => {
                 body: JSON.stringify({
                   tenant_id: customer.id,
                   tenant_name: customer.name,
+                  hub_id: hubId,
                   admin_email: customer.contact_email || `${customer.name.toLowerCase().replace(/\s/g, '')}@kanycollege.com`
                 })
               });

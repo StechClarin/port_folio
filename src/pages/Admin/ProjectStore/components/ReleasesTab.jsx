@@ -18,12 +18,28 @@ const ReleasesTab = () => {
   const [newRelease, setNewRelease] = useState({ 
     appId: '', 
     version: '', 
-    metadataUrl: '',
-    downloadUrl: '',
-    checksum: '',
+    metadataBaseUrl: '',
     sizeMB: '',
-    platform: 'windows-latest'
+    platforms: [] // Array of selected platforms
   });
+  
+  const [platformData, setPlatformData] = useState({}); // { 'windows-latest': { checksum, downloadUrl }, ... }
+
+  useEffect(() => {
+    const handleOutsideClick = () => {
+      if (openDropdownId) {
+        setOpenDropdownId(null);
+      }
+    };
+    
+    if (openDropdownId) {
+      document.addEventListener('click', handleOutsideClick);
+    }
+    
+    return () => {
+      document.removeEventListener('click', handleOutsideClick);
+    };
+  }, [openDropdownId]);
   
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -63,38 +79,67 @@ const ReleasesTab = () => {
   }, [fetchData]);
 
   const handleFetchMetadata = async () => {
-    if (!newRelease.metadataUrl) {
-      toast.error('Veuillez saisir l\'URL du fichier metadata.json');
+    if (!newRelease.metadataBaseUrl) {
+      toast.error('Veuillez saisir l\'URL de base des métadonnées');
+      return;
+    }
+
+    if (newRelease.platforms.length === 0) {
+      toast.error('Veuillez sélectionner au moins une plateforme');
       return;
     }
 
     try {
       setIsSubmitting(true);
-      const response = await fetch(newRelease.metadataUrl);
-      if (!response.ok) throw new Error('Impossible de charger le fichier de métadonnées');
-      
-      const data = await response.json();
-      
-      // Map JSON fields to form
-      // data.hash -> checksum
-      // data.version -> version
-      // data.archive -> extracted from metadata URL
-      
-      const baseUrl = newRelease.metadataUrl.substring(0, newRelease.metadataUrl.lastIndexOf('/') + 1);
-      const computedDownloadUrl = baseUrl + (data.archive || '');
+      const newPlatformData = {};
+      let version = newRelease.version;
 
+      // Fetch metadata for each selected platform
+      for (const platform of newRelease.platforms) {
+        const metadataFileName = 
+          platform === 'windows-latest' ? 'metadata-win.json' :
+          platform === 'ubuntu-latest' ? 'metadata-linux.json' :
+          platform === 'macos-latest' ? 'metadata-mac.json' : null;
+
+        if (!metadataFileName) {
+          toast.error(`Plateforme inconnue: ${platform}`);
+          continue;
+        }
+
+        const metadataUrl = `${newRelease.metadataBaseUrl}/${metadataFileName}`;
+        console.log(`Fetching metadata for ${platform} from ${metadataUrl}`);
+
+        const response = await fetch(metadataUrl);
+        if (!response.ok) {
+          throw new Error(`Impossible de charger metadata pour ${platform} (${response.status})`);
+        }
+
+        const data = await response.json();
+        
+        const baseUrl = newRelease.metadataBaseUrl;
+        const computedDownloadUrl = baseUrl + (data.archive || '');
+
+        newPlatformData[platform] = {
+          checksum: data.hash,
+          downloadUrl: computedDownloadUrl,
+          os: data.os
+        };
+
+        if (!version && data.version) {
+          version = data.version;
+        }
+      }
+
+      setPlatformData(newPlatformData);
       setNewRelease(prev => ({
         ...prev,
-        version: data.version || prev.version,
-        checksum: data.hash || prev.checksum,
-        downloadUrl: computedDownloadUrl || prev.downloadUrl,
-        platform: data.os || prev.platform
+        version: version || prev.version
       }));
 
-      toast.success('Métadonnées récupérées avec succès !');
+      toast.success(`Métadonnées récupérées pour ${newRelease.platforms.length} plateforme(s) !`);
     } catch (err) {
       console.error('Metadata fetch error:', err);
-      toast.error('Erreur lors de la lecture du metadata.json. Vérifiez l\'URL et le CORS.');
+      toast.error(`Erreur lors de la lecture des métadonnées: ${err.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -102,57 +147,71 @@ const ReleasesTab = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!newRelease.appId || !newRelease.version || !newRelease.downloadUrl || !newRelease.checksum) {
-      toast.error('Please fill all required fields');
+    if (!newRelease.appId || !newRelease.version || newRelease.platforms.length === 0) {
+      toast.error('Please fill all required fields and select at least one platform');
       return;
+    }
+
+    // Verify all platforms have metadata
+    for (const platform of newRelease.platforms) {
+      if (!platformData[platform]?.checksum || !platformData[platform]?.downloadUrl) {
+        toast.error(`Métadonnées manquantes pour ${platform}. Veuillez fetcher les métadonnées.`);
+        return;
+      }
     }
 
     setIsSubmitting(true);
     try {
-      if (editingRelease) {
-        // UPDATE
-        const { data, error } = await supabase
-          .from('app_releases')
-          .update({
-            app_id: newRelease.appId,
-            version: newRelease.version,
-            download_url: newRelease.downloadUrl,
-            checksum: newRelease.checksum,
-            size_bytes: newRelease.sizeMB ? parseInt(newRelease.sizeMB) * 1024 * 1024 : 0,
-            platform: newRelease.platform,
-          })
-          .eq('id', editingRelease.id)
-          .select('*, apps(name)')
-          .single();
+      // Create or update a release for each selected platform
+      for (const platform of newRelease.platforms) {
+        const releaseData = {
+          app_id: newRelease.appId,
+          version: newRelease.version,
+          download_url: platformData[platform].downloadUrl,
+          checksum: platformData[platform].checksum,
+          size_bytes: newRelease.sizeMB ? parseInt(newRelease.sizeMB) * 1024 * 1024 : 0,
+          platform: platform,
+          is_active: true,
+          released_at: new Date().toISOString()
+        };
 
-        if (error) throw error;
-        setReleases(releases.map(r => r.id === editingRelease.id ? data : r));
-        toast.success('Release updated successfully!');
-      } else {
-        // CREATE
-        const { data, error } = await supabase
-          .from('app_releases')
-          .insert([{
-            app_id: newRelease.appId,
-            version: newRelease.version,
-            download_url: newRelease.downloadUrl,
-            checksum: newRelease.checksum,
-            size_bytes: newRelease.sizeMB ? parseInt(newRelease.sizeMB) * 1024 * 1024 : 0,
-            platform: newRelease.platform,
-            is_active: true,
-            released_at: new Date().toISOString()
-          }])
-          .select('*, apps(name)')
-          .single();
+        if (editingRelease) {
+          // UPDATE: look for release with same app_id, version, and platform
+          const existingRelease = releases.find(r => 
+            r.app_id === newRelease.appId && 
+            r.version === newRelease.version && 
+            r.platform === platform
+          );
 
-        if (error) throw error;
-        setReleases([data, ...releases]);
-        toast.success('Release published successfully!');
+          if (existingRelease) {
+            const { data, error } = await supabase
+              .from('app_releases')
+              .update(releaseData)
+              .eq('id', existingRelease.id)
+              .select('*, apps(name)')
+              .single();
+
+            if (error) throw error;
+            setReleases(releases.map(r => r.id === existingRelease.id ? data : r));
+          }
+        } else {
+          // CREATE
+          const { data, error } = await supabase
+            .from('app_releases')
+            .insert([releaseData])
+            .select('*, apps(name)')
+            .single();
+
+          if (error) throw error;
+          setReleases([data, ...releases]);
+        }
       }
 
+      toast.success(`Release(s) publiée(s) pour ${newRelease.platforms.length} plateforme(s) !`);
       setIsUploadModalOpen(false);
       setEditingRelease(null);
-      setNewRelease({ appId: apps[0]?.id || '', version: '', downloadUrl: '', checksum: '', sizeMB: '', metadataUrl: '', platform: 'windows-latest' });
+      setNewRelease({ appId: apps[0]?.id || '', version: '', metadataBaseUrl: '', sizeMB: '', platforms: [] });
+      setPlatformData({});
     } catch (err) {
       console.error('Error saving release:', err);
       toast.error(err.message || 'Failed to save release');
@@ -166,11 +225,16 @@ const ReleasesTab = () => {
     setNewRelease({
       appId: release.app_id,
       version: release.version,
-      downloadUrl: release.download_url,
-      checksum: release.checksum,
+      metadataBaseUrl: '',
       sizeMB: release.size_bytes ? Math.round(release.size_bytes / 1024 / 1024).toString() : '',
-      metadataUrl: '',
-      platform: release.platform || 'windows-latest'
+      platforms: [release.platform]
+    });
+    setPlatformData({
+      [release.platform]: {
+        checksum: release.checksum,
+        downloadUrl: release.download_url,
+        os: release.platform
+      }
     });
     setIsUploadModalOpen(true);
   };
@@ -178,7 +242,8 @@ const ReleasesTab = () => {
   const handleCloseModal = () => {
     setIsUploadModalOpen(false);
     setEditingRelease(null);
-    setNewRelease({ appId: apps[0]?.id || '', version: '', downloadUrl: '', checksum: '', sizeMB: '', metadataUrl: '', platform: 'windows-latest' });
+    setNewRelease({ appId: apps[0]?.id || '', version: '', metadataBaseUrl: '', sizeMB: '', platforms: [] });
+    setPlatformData({});
   };
 
   const handleToggleReleaseStatus = async (releaseId, currentStatus) => {
@@ -238,11 +303,6 @@ const ReleasesTab = () => {
 
   return (
     <div className="space-y-6 relative">
-      {/* Overlay click-outside for dropdown */}
-      {openDropdownId && (
-        <div className="fixed inset-0 z-40" onClick={() => setOpenDropdownId(null)}></div>
-      )}
-
       {/* Top Banner Actions */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-gray-900/40 p-4 rounded-xl border border-gray-700/50">
         <div className="flex items-center gap-4 w-full sm:w-auto">
@@ -354,15 +414,18 @@ const ReleasesTab = () => {
                               </button>
                            </div>
                         </td>
-                         <td className="px-6 py-4 whitespace-nowrap text-right relative">
-                            <div className="flex items-center justify-end relative">
+                        <td className="px-6 py-4 whitespace-nowrap text-right relative">
+                            <div className="flex items-center justify-end">
                                
                                {/* Menu Content (Horizontal Icons) - Appears on Left of Trigger */}
                                {openDropdownId === release.id && (
-                                  <div className="absolute right-12 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-gray-900 border border-gray-700 rounded-full shadow-xl px-1.5 py-1.5 z-[100] animate-in slide-in-from-right-2 fade-in duration-200 origin-right">
+                                  <div 
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="absolute right-12 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-gray-900 border border-gray-700 rounded-full shadow-xl px-1.5 py-1.5 z-50 animate-in slide-in-from-right-2 fade-in duration-200 origin-right pointer-events-auto"
+                                  >
                                      <button 
                                         onClick={(e) => { e.stopPropagation(); handleEditClick(release); setOpenDropdownId(null); }}
-                                        className="p-2 rounded-full text-gray-400 hover:bg-violet-500/20 hover:text-violet-400 transition-colors"
+                                        className="p-2 rounded-full text-gray-400 hover:bg-violet-500/20 hover:text-violet-400 transition-colors cursor-pointer"
                                         title="Modifier"
                                      >
                                         <Edit size={16} />
@@ -370,7 +433,7 @@ const ReleasesTab = () => {
 
                                      <button 
                                         onClick={(e) => { e.stopPropagation(); handleToggleReleaseStatus(release.id, release.is_active); setOpenDropdownId(null); }}
-                                        className="p-2 rounded-full text-gray-400 hover:bg-violet-500/20 hover:text-white transition-colors"
+                                        className="p-2 rounded-full text-gray-400 hover:bg-violet-500/20 hover:text-white transition-colors cursor-pointer"
                                         title={release.is_active ? "Désactiver" : "Activer"}
                                      >
                                         {release.is_active ? <PowerOff size={16} className="text-amber-500" /> : <Power size={16} className="text-emerald-500" />}
@@ -380,7 +443,7 @@ const ReleasesTab = () => {
 
                                      <button 
                                         onClick={(e) => { e.stopPropagation(); handleDeleteRelease(release.id); setOpenDropdownId(null); }}
-                                        className="p-2 rounded-full text-gray-400 hover:bg-red-500/20 hover:text-red-400 transition-colors"
+                                        className="p-2 rounded-full text-gray-400 hover:bg-red-500/20 hover:text-red-400 transition-colors cursor-pointer"
                                         title="Supprimer"
                                      >
                                         <Trash2 size={16} />
@@ -394,7 +457,7 @@ const ReleasesTab = () => {
                                      e.stopPropagation();
                                      setOpenDropdownId(openDropdownId === release.id ? null : release.id);
                                   }}
-                                  className={`w-9 h-9 flex items-center justify-center rounded-full shadow-lg transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-violet-500/30 ${
+                                  className={`w-9 h-9 flex items-center justify-center rounded-full shadow-lg transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-violet-500/30 cursor-pointer ${
                                      openDropdownId === release.id 
                                      ? 'bg-violet-700 text-white scale-105 ring-4 ring-violet-500/30' 
                                      : 'bg-violet-600 text-white hover:bg-violet-700 hover:scale-105'
@@ -427,10 +490,11 @@ const ReleasesTab = () => {
         title={editingRelease ? "Edit Release" : "Upload New Release"}
       >
         <form className="space-y-4" onSubmit={handleSubmit}>
-           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">Target Application</label>
                 <select value={newRelease.appId} onChange={e => setNewRelease({...newRelease, appId: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-violet-500 focus:border-violet-500 appearance-none">
+                   <option value="">Select an app...</option>
                    {apps.map(app => (
                       <option key={app.id} value={app.id}>{app.name}</option>
                    ))}
@@ -438,90 +502,105 @@ const ReleasesTab = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">Semantic Version</label>
-                <input type="text" required value={newRelease.version} onChange={e => setNewRelease({...newRelease, version: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white font-mono text-sm focus:ring-violet-500 focus:border-violet-500" placeholder="e.g. 1.0.0" />
+                <input type="text" required value={newRelease.version} onChange={e => setNewRelease({...newRelease, version: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white font-mono text-sm focus:ring-violet-500 focus:border-violet-500" placeholder="e.g. 1.0.12" />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">OS / Platform</label>
-                <select value={newRelease.platform} onChange={e => setNewRelease({...newRelease, platform: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-violet-500 focus:border-violet-500 appearance-none">
-                   <option value="windows-latest">Windows (.exe / .zip)</option>
-                   <option value="ubuntu-latest">Linux (.tar.gz)</option>
-                </select>
+           </div>
+
+           <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">📱 Target Platforms (Multi-select)</label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {['windows-latest', 'ubuntu-latest', 'macos-latest'].map(platform => {
+                  const platformLabel = platform === 'windows-latest' ? '🪟 Windows' : platform === 'ubuntu-latest' ? '🐧 Linux' : '🍎 macOS';
+                  return (
+                    <label key={platform} className="flex items-center gap-3 p-3 bg-gray-800 border border-gray-700 rounded-lg cursor-pointer hover:border-violet-500/50 transition">
+                      <input 
+                        type="checkbox" 
+                        checked={newRelease.platforms.includes(platform)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setNewRelease({...newRelease, platforms: [...newRelease.platforms, platform]});
+                          } else {
+                            setNewRelease({...newRelease, platforms: newRelease.platforms.filter(p => p !== platform)});
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-gray-700 text-violet-600 focus:ring-violet-500"
+                      />
+                      <span className="text-white text-sm font-medium">{platformLabel}</span>
+                    </label>
+                  );
+                })}
               </div>
            </div>
            
            <div className="bg-violet-500/5 border border-violet-500/20 p-4 rounded-xl space-y-3">
               <div className="flex items-center justify-between">
-                 <label className="block text-sm font-medium text-violet-300">Option : Récupération Automatique</label>
-                 <span className="text-[10px] text-gray-500 font-mono">Lecture du metadata.json</span>
+                 <label className="block text-sm font-medium text-violet-300">🔄 Auto-fetch Metadata</label>
+                 <span className="text-[10px] text-gray-500 font-mono">metadata-win.json, metadata-linux.json, metadata-mac.json</span>
               </div>
-              <div className="flex gap-2">
-                 <div className="relative flex-1">
-                    <input 
-                      type="url" 
-                      placeholder="URL du fichier metadata.json"
-                      value={newRelease.metadataUrl || ''}
-                      onChange={e => setNewRelease({...newRelease, metadataUrl: e.target.value})}
-                      className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-white text-xs focus:ring-violet-500 focus:border-violet-500"
-                    />
-                 </div>
+              <div className="space-y-2">
+                 <input 
+                   type="url" 
+                   placeholder="Base URL for metadata files (e.g., http://72.60.2.96:8080/schoolmanage/test/releases/v1.0.12)"
+                   value={newRelease.metadataBaseUrl || ''}
+                   onChange={e => setNewRelease({...newRelease, metadataBaseUrl: e.target.value})}
+                   className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-white text-xs focus:ring-violet-500 focus:border-violet-500"
+                 />
                  <button 
                    type="button" 
                    onClick={handleFetchMetadata}
-                   disabled={isSubmitting}
-                   className="px-4 py-2 bg-violet-600/80 hover:bg-violet-600 text-white text-xs rounded-lg transition border border-violet-500/30 flex items-center gap-2"
+                   disabled={isSubmitting || newRelease.platforms.length === 0}
+                   className="w-full px-4 py-2 bg-violet-600/80 hover:bg-violet-600 disabled:bg-gray-700 disabled:text-gray-500 text-white text-xs rounded-lg transition border border-violet-500/30 flex items-center justify-center gap-2"
                  >
-                    {isSubmitting ? 'Fetching...' : 'Fetch'}
+                    {isSubmitting ? 'Fetching...' : 'Fetch Metadata for Selected Platforms'}
                  </button>
               </div>
-              <p className="text-[10px] text-gray-400 italic">Remplira automatiquement la version, le Hash SHA-256 et le lien de téléchargement.</p>
+              <p className="text-[10px] text-gray-400 italic">Will read metadata-win.json, metadata-linux.json, metadata-mac.json and populate version, checksum, and download URLs.</p>
            </div>
+
+           {/* Display platform-specific data */}
+           {newRelease.platforms.length > 0 && (
+             <div className="bg-gray-800/30 border border-gray-700/50 p-4 rounded-lg space-y-3">
+               <h3 className="text-sm font-medium text-violet-300">Platform Details</h3>
+               {newRelease.platforms.map(platform => {
+                 const data = platformData[platform];
+                 const platformLabel = platform === 'windows-latest' ? '🪟 Windows' : platform === 'ubuntu-latest' ? '🐧 Linux' : '🍎 macOS';
+                 return (
+                   <div key={platform} className="bg-gray-900/50 border border-gray-700/50 p-3 rounded-lg space-y-2">
+                     <div className="font-mono text-xs text-gray-400">{platformLabel}</div>
+                     <div>
+                       <label className="block text-xs text-gray-400 mb-1">Download URL</label>
+                       <input 
+                         type="url"
+                         readOnly
+                         value={data?.downloadUrl || ''}
+                         className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-white text-xs font-mono opacity-75"
+                       />
+                     </div>
+                     <div>
+                       <label className="block text-xs text-gray-400 mb-1">SHA-256 Checksum</label>
+                       <input 
+                         type="text"
+                         readOnly
+                         value={data?.checksum || ''}
+                         className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-white text-xs font-mono opacity-75"
+                       />
+                     </div>
+                   </div>
+                 );
+               })}
+             </div>
+           )}
+
 
            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Archive Download Link (URL)</label>
-              <div className="relative">
-                 <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                    <DownloadCloud className="w-5 h-5 text-gray-400" />
-                 </div>
-                 <input 
-                    type="url" 
-                    required
-                    value={newRelease.downloadUrl} 
-                    onChange={e => setNewRelease({...newRelease, downloadUrl: e.target.value})}
-                    className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 pl-10 text-white text-sm focus:ring-violet-500 focus:border-violet-500 font-mono" 
-                    placeholder={import.meta.env.VITE_RELEASE_BASE_URL ? import.meta.env.VITE_RELEASE_BASE_URL + "..." : "https://server.com/releases/..."} 
-                 />
-              </div>
-              {import.meta.env.VITE_RELEASE_BASE_URL && (
-                 <p className="mt-1 text-[10px] text-violet-400/70 truncate">
-                    Base URL active: <span className="font-mono">{import.meta.env.VITE_RELEASE_BASE_URL}</span>
-                 </p>
-              )}
-           </div>
-
-           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="sm:col-span-2">
-                 <label className="block text-sm font-medium text-gray-300 mb-1 flex items-center gap-2">
-                    <Shield size={14} className="text-emerald-400" /> SHA-256 Checksum
-                 </label>
-                 <input 
-                    type="text" 
-                    required
-                    value={newRelease.checksum} 
-                    onChange={e => setNewRelease({...newRelease, checksum: e.target.value})}
-                    className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-white text-xs focus:ring-emerald-500 focus:border-emerald-500 font-mono" 
-                    placeholder="From metadata.json..." 
-                 />
-              </div>
-              <div className="sm:col-span-1">
-                 <label className="block text-sm font-medium text-gray-300 mb-1">Size (MB)</label>
-                 <input 
-                    type="number" 
-                    value={newRelease.sizeMB} 
-                    onChange={e => setNewRelease({...newRelease, sizeMB: e.target.value})}
-                    className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:ring-violet-500 focus:border-violet-500" 
-                    placeholder="Optional" 
-                 />
-              </div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Size (MB) - Optional</label>
+              <input 
+                 type="number" 
+                 value={newRelease.sizeMB} 
+                 onChange={e => setNewRelease({...newRelease, sizeMB: e.target.value})}
+                 className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:ring-violet-500 focus:border-violet-500" 
+                 placeholder="Optional" 
+              />
            </div>
            
            <div className="pt-4 flex justify-end gap-3 border-t border-gray-800 mt-6">
