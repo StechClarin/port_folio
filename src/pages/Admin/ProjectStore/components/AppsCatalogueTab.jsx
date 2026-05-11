@@ -33,7 +33,8 @@ const AppsCatalogueTab = () => {
     isFeatured: false,
     iconSvg: '',
     bannerUrl: '',
-    builder: ''
+    builder: '',
+    cloudApiUrl: ''
   });
   const [newModule, setNewModule] = useState({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0 });
 
@@ -86,7 +87,8 @@ const AppsCatalogueTab = () => {
             is_featured: newApp.isFeatured,
             icon_svg: newApp.iconSvg,
             banner_url: newApp.bannerUrl,
-            builder: newApp.builder
+            builder: newApp.builder,
+            cloud_api_url: newApp.cloudApiUrl
           })
           .eq('id', selectedApp.id)
           .select()
@@ -110,6 +112,7 @@ const AppsCatalogueTab = () => {
             icon_svg: newApp.iconSvg,
             banner_url: newApp.bannerUrl,
             builder: newApp.builder,
+            cloud_api_url: newApp.cloudApiUrl,
             is_active: false // Draft by default
           }])
           .select()
@@ -125,7 +128,7 @@ const AppsCatalogueTab = () => {
       setIsEditMode(false);
       setNewApp({ 
         name: '', slug: '', description: '', basePrice: 0, 
-        isMobile: false, isFeatured: false, iconSvg: '', bannerUrl: '', builder: '' 
+        isMobile: false, isFeatured: false, iconSvg: '', bannerUrl: '', builder: '', cloudApiUrl: '' 
       });
     } catch (error) {
       console.error('Error saving app:', error);
@@ -146,7 +149,8 @@ const AppsCatalogueTab = () => {
       isFeatured: selectedApp.is_featured || false,
       iconSvg: selectedApp.icon_svg || '',
       bannerUrl: selectedApp.banner_url || '',
-      builder: selectedApp.builder || ''
+      builder: selectedApp.builder || '',
+      cloudApiUrl: selectedApp.cloud_api_url || ''
     });
     setIsAppMenuOpen(false);
     setIsAppModalOpen(true);
@@ -348,7 +352,7 @@ const AppsCatalogueTab = () => {
             <button 
               onClick={() => {
                 setIsEditMode(false);
-                setNewApp({ name: '', slug: '', description: '', basePrice: 0, isMobile: false });
+                setNewApp({ name: '', slug: '', description: '', basePrice: 0, isMobile: false, isFeatured: false, iconSvg: '', bannerUrl: '', builder: '', cloudApiUrl: '' });
                 setIsAppModalOpen(true);
               }}
               className="bg-violet-600 hover:bg-violet-700 text-white p-2 rounded-lg transition-colors shadow-lg shadow-violet-500/20"
@@ -589,14 +593,20 @@ const AppsCatalogueTab = () => {
                   <input type="text" value={newApp.name} onChange={e => setNewApp({...newApp, name: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-violet-500 focus:border-violet-500" placeholder="e.g. Yekola" />
                </div>
                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Technical Slug</label>
+                  <input type="text" disabled={isEditMode} value={newApp.slug} onChange={e => setNewApp({...newApp, slug: e.target.value})} className={`w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white font-mono text-sm focus:ring-violet-500 focus:border-violet-500 ${isEditMode ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder="e.g. school-manage" />
+                  {!isEditMode && <p className="mt-1 text-xs text-gray-500">Must be unique, lowercase, without spaces.</p>}
+               </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+               <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">Developer (Builder)</label>
                   <input type="text" value={newApp.builder} onChange={e => setNewApp({...newApp, builder: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-violet-500 focus:border-violet-500" placeholder="e.g. StechClarin" />
                </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Technical Slug</label>
-              <input type="text" disabled={isEditMode} value={newApp.slug} onChange={e => setNewApp({...newApp, slug: e.target.value})} className={`w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white font-mono text-sm focus:ring-violet-500 focus:border-violet-500 ${isEditMode ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder="e.g. school-manage" />
-              {!isEditMode && <p className="mt-1 text-xs text-gray-500">Must be unique, lowercase, without spaces.</p>}
+               <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Cloud API URL (Serveur Maître)</label>
+                  <input type="url" value={newApp.cloudApiUrl} onChange={e => setNewApp({...newApp, cloudApiUrl: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-violet-500 focus:border-violet-500 font-mono text-sm" placeholder="http://72.60.2.96:8080/schoolmanage/" />
+               </div>
             </div>
            <div>
              <label className="block text-sm font-medium text-gray-300 mb-1">Description</label>
