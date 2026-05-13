@@ -106,7 +106,7 @@ const ReleasesTab = () => {
           continue;
         }
 
-        const metadataUrl = `${newRelease.metadataBaseUrl}/${metadataFileName}`;
+        const metadataUrl = `${newRelease.metadataBaseUrl.replace(/\/+$/,'')}/${metadataFileName}`;
         console.log(`Fetching metadata for ${platform} from ${metadataUrl}`);
 
         const response = await fetch(metadataUrl);
@@ -116,8 +116,8 @@ const ReleasesTab = () => {
 
         const data = await response.json();
         
-        const baseUrl = newRelease.metadataBaseUrl;
-        const computedDownloadUrl = baseUrl + (data.archive || '');
+        const normalizedBaseUrl = newRelease.metadataBaseUrl.replace(/\/+$/,'') + '/';
+        const computedDownloadUrl = new URL(data.archive || '', normalizedBaseUrl).toString();
 
         newPlatformData[platform] = {
           checksum: data.hash,

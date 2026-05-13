@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, ShieldAlert, ShieldCheck, Edit, UserCog, Power, Save, Loader2, RefreshCw, Trash2, Copy, UserPlus, Key } from 'lucide-react';
+import { Search, ShieldAlert, ShieldCheck, Edit, UserCog, Power, Save, Loader2, RefreshCw, Trash2, Copy, UserPlus } from 'lucide-react';
 import StoreModal from './StoreModal';
 import { supabase } from '../../../../lib/supabaseClient';
 import toast from 'react-hot-toast';
@@ -19,10 +19,7 @@ const CustomersTab = () => {
     hubId: '', 
     email: '', 
     phone: '', 
-    ownerId: '', 
     isActive: true,
-    password: '',
-    createUser: false 
   });
 
   const handleCopyHubId = (hubId) => {
@@ -54,7 +51,7 @@ const CustomersTab = () => {
   }, [fetchData]);
 
   const resetForm = useCallback(() => {
-    setNewTenant({ id: '', name: '', hubId: '', email: '', phone: '', ownerId: '', isActive: true, password: '', createUser: false });
+    setNewTenant({ id: '', name: '', hubId: '', email: '', phone: '', isActive: true });
   }, []);
 
   const handleToggleTenantStatus = async (tenantId, currentStatus) => {
@@ -91,7 +88,6 @@ const CustomersTab = () => {
             contact_email: newTenant.email,
             contact_phone: newTenant.phone,
             hub_id: newTenant.hubId,
-            owner_id: newTenant.ownerId || null,
             is_active: newTenant.isActive
           })
           .eq('id', newTenant.id)
@@ -105,53 +101,30 @@ const CustomersTab = () => {
         setIsEditTenantMode(false);
         toast.success('Tenant updated successfully!');
       } else {
-        // CREATE LOGIC
-        if (newTenant.createUser) {
-          // 1. Automated RPC Call
-          const { data: rpcData, error: rpcError } = await supabase.rpc('create_tenant_with_auth', {
-            t_name: newTenant.name,
-            t_email: newTenant.email,
-            t_phone: newTenant.phone,
-            t_password: newTenant.password,
-            t_hub_id: newTenant.hubId || null
-          });
+        // CREATE LOGIC: automatic user creation with default password
+        const { data: rpcData, error: rpcError } = await supabase.rpc('create_tenant_with_auth', {
+          t_name: newTenant.name,
+          t_email: newTenant.email,
+          t_phone: newTenant.phone,
+          t_password: 'admin@1234',
+          t_hub_id: newTenant.hubId || null
+        });
 
-          if (rpcError) throw rpcError;
-          
-          if (rpcData && rpcData.success === false) {
-            throw new Error(rpcData.message || 'Failed to create user/tenant');
-          }
-
-          // 2. Refresh customer list
-          const { data: fullTenant, error: fetchError } = await supabase
-            .from('tenants')
-            .select('*, tenant_licenses(id)')
-            .eq('id', rpcData.tenant_id)
-            .single();
-          
-          if (fetchError) throw fetchError;
-          setCustomers([fullTenant, ...customers]);
-          toast.success('Tenant & User created successfully!');
-        } else {
-          // 2. Standard Manual Insert
-          const { data, error } = await supabase
-            .from('tenants')
-            .insert([{
-              name: newTenant.name,
-              contact_email: newTenant.email,
-              contact_phone: newTenant.phone,
-              hub_id: newTenant.hubId || `ETH-NANOS-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
-              owner_id: newTenant.ownerId || null,
-              is_active: newTenant.isActive
-            }])
-            .select('*, tenant_licenses(id)')
-            .single();
-
-          if (error) throw error;
-          setCustomers([data, ...customers]);
-          toast.success('Tenant registered successfully!');
+        if (rpcError) throw rpcError;
+        if (rpcData && rpcData.success === false) {
+          throw new Error(rpcData.message || 'Failed to create user/tenant');
         }
+
+        const { data: fullTenant, error: fetchError } = await supabase
+          .from('tenants')
+          .select('*, tenant_licenses(id)')
+          .eq('id', rpcData.tenant_id)
+          .single();
+        
+        if (fetchError) throw fetchError;
+        setCustomers([fullTenant, ...customers]);
         setIsTenantModalOpen(false);
+        toast.success('Tenant & User created successfully!');
       }
       resetForm();
     } catch (error) {
@@ -170,10 +143,7 @@ const CustomersTab = () => {
       hubId: tenant.hub_id || '',
       email: tenant.contact_email || '',
       phone: tenant.contact_phone || '',
-      ownerId: tenant.owner_id || '',
       isActive: tenant.is_active,
-      password: '', // Password is not edited here
-      createUser: false // Cannot create user when editing existing tenant
     });
     setIsTenantModalOpen(true);
   };
@@ -287,12 +257,6 @@ const CustomersTab = () => {
                        <div className={`w-2 h-2 rounded-full ${customer.is_active ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
                        Seen: {customer.last_sync_at ? new Date(customer.last_sync_at).toLocaleDateString() : 'Never'}
                     </span>
-                    {customer.owner_id && (
-                      <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full border border-slate-700 flex items-center gap-1" title={customer.owner_id}>
-                        <UserCog size={10} className="text-fuchsia-400" />
-                        ID: {customer.owner_id.substring(0, 8)}...
-                      </span>
-                    )}
                  </div>
                </div>
             </div>
@@ -358,33 +322,10 @@ const CustomersTab = () => {
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
-                    <label htmlFor="createUser" className="text-violet-400 font-bold cursor-pointer">Automatisation Supabase Auth</label>
-                    <input 
-                      type="checkbox" 
-                      id="createUser" 
-                      checked={newTenant.createUser} 
-                      onChange={e => setNewTenant({...newTenant, createUser: e.target.checked})} 
-                      className="w-5 h-5 rounded border-gray-600 text-violet-600 focus:ring-violet-500 bg-gray-800"
-                    />
+                    <span className="text-violet-400 font-bold">Utilisateur automatique</span>
+                    <span className="text-xs text-gray-400 uppercase tracking-tight">Password: admin@1234</span>
                   </div>
-                  <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-tight font-semibold">Crée automatiquement un compte de connexion</p>
-                  
-                  {newTenant.createUser && (
-                    <div className="mt-4 animate-[fadeIn_0.2s_ease-out]">
-                      <label className="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Mot de passe temporaire <span className="text-red-500">*</span></label>
-                      <div className="relative">
-                        <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
-                        <input 
-                          type="password" 
-                          required={newTenant.createUser}
-                          value={newTenant.password} 
-                          onChange={e => setNewTenant({...newTenant, password: e.target.value})} 
-                          className="w-full bg-gray-950 border border-gray-700 rounded-lg py-2 pl-9 pr-4 text-white text-sm focus:ring-violet-600 focus:border-violet-600" 
-                          placeholder="••••••••" 
-                        />
-                      </div>
-                    </div>
-                  )}
+                  <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-tight font-semibold">Le tenant créé recevra automatiquement un utilisateur Supabase.</p>
                 </div>
              </div>
            )}
@@ -425,18 +366,6 @@ const CustomersTab = () => {
                </div>
                {!isEditTenantMode && <p className="mt-1 text-xs text-gray-500">Leave blank to auto-generate.</p>}
              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Supabase Owner ID</label>
-                <input 
-                  type="text" 
-                  disabled={newTenant.createUser}
-                  value={newTenant.createUser ? 'AUTO-LINKED' : newTenant.ownerId} 
-                  onChange={e => setNewTenant({...newTenant, ownerId: e.target.value})} 
-                  className={`w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white font-mono text-xs focus:ring-emerald-500 focus:border-emerald-500 ${newTenant.createUser ? 'opacity-50 italic' : ''}`} 
-                  placeholder={newTenant.createUser ? 'Géré par l\'automatisation' : "Coller l'ID utilisateur"} 
-                />
-                <p className="mt-1 text-[10px] text-gray-500 italic">Links the tenant to a Supabase auth user.</p>
-              </div>
            </div>
            
            <div className="bg-emerald-900/10 border border-emerald-500/20 p-4 rounded-xl flex items-start gap-3 mt-4">
