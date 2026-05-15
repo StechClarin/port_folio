@@ -31,6 +31,7 @@ const AppsCatalogueTab = () => {
     basePrice: 0, 
     isMobile: false,
     isFeatured: false,
+    isOfferOfTheYear: false,
     iconSvg: '',
     bannerUrl: '',
     builder: '',
@@ -85,6 +86,7 @@ const AppsCatalogueTab = () => {
             base_price: newApp.basePrice,
             is_mobile: newApp.isMobile,
             is_featured: newApp.isFeatured,
+            is_offer_of_the_year: newApp.isOfferOfTheYear,
             icon_svg: newApp.iconSvg,
             banner_url: newApp.bannerUrl,
             builder: newApp.builder,
@@ -109,6 +111,7 @@ const AppsCatalogueTab = () => {
             base_price: newApp.basePrice,
             is_mobile: newApp.isMobile,
             is_featured: newApp.isFeatured,
+            is_offer_of_the_year: newApp.isOfferOfTheYear,
             icon_svg: newApp.iconSvg,
             banner_url: newApp.bannerUrl,
             builder: newApp.builder,
@@ -128,7 +131,7 @@ const AppsCatalogueTab = () => {
       setIsEditMode(false);
       setNewApp({ 
         name: '', slug: '', description: '', basePrice: 0, 
-        isMobile: false, isFeatured: false, iconSvg: '', bannerUrl: '', builder: '', cloudApiUrl: '' 
+        isMobile: false, isFeatured: false, isOfferOfTheYear: false, iconSvg: '', bannerUrl: '', builder: '', cloudApiUrl: '' 
       });
     } catch (error) {
       console.error('Error saving app:', error);
@@ -147,6 +150,7 @@ const AppsCatalogueTab = () => {
       basePrice: selectedApp.base_price || 0,
       isMobile: selectedApp.is_mobile || false,
       isFeatured: selectedApp.is_featured || false,
+      isOfferOfTheYear: selectedApp.is_offer_of_the_year || false,
       iconSvg: selectedApp.icon_svg || '',
       bannerUrl: selectedApp.banner_url || '',
       builder: selectedApp.builder || '',
@@ -171,10 +175,32 @@ const AppsCatalogueTab = () => {
       
       setApps(apps.map(a => a.id === data.id ? data : a));
       setSelectedApp(data);
-      toast.success(newStatus ? 'App featured!' : 'App unfeatured');
+      toast.success(newStatus ? 'App Featured!' : 'App unfeatured');
     } catch (err) {
       console.error(err);
       toast.error('Failed to change featured status');
+    }
+  };
+
+  const handleToggleOfferOfYear = async () => {
+    if (!selectedApp) return;
+    const newStatus = !selectedApp.is_offer_of_the_year;
+    try {
+      const { data, error } = await supabase
+        .from('apps')
+        .update({ is_offer_of_the_year: newStatus })
+        .eq('id', selectedApp.id)
+        .select()
+        .single();
+        
+      if (error) throw error;
+      
+      setApps(apps.map(a => a.id === data.id ? data : a));
+      setSelectedApp(data);
+      toast.success(newStatus ? 'Set as Offer of the Year!' : 'Offer of the Year removed');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to change Offer of the Year status');
     }
   };
 
@@ -352,7 +378,7 @@ const AppsCatalogueTab = () => {
             <button 
               onClick={() => {
                 setIsEditMode(false);
-                setNewApp({ name: '', slug: '', description: '', basePrice: 0, isMobile: false, isFeatured: false, iconSvg: '', bannerUrl: '', builder: '', cloudApiUrl: '' });
+                setNewApp({ name: '', slug: '', description: '', basePrice: 0, isMobile: false, isFeatured: false, isOfferOfTheYear: false, iconSvg: '', bannerUrl: '', builder: '', cloudApiUrl: '' });
                 setIsAppModalOpen(true);
               }}
               className="bg-violet-600 hover:bg-violet-700 text-white p-2 rounded-lg transition-colors shadow-lg shadow-violet-500/20"
@@ -394,7 +420,7 @@ const AppsCatalogueTab = () => {
                     ) : (
                        app.name.charAt(0)
                     )}
-                    {app.is_featured && (
+                    {(app.is_featured || app.is_offer_of_the_year) && (
                       <div className="absolute -top-1 -right-1 bg-amber-500 text-white rounded-full p-0.5 shadow-lg">
                         <Star size={10} fill="currentColor" />
                       </div>
@@ -403,7 +429,8 @@ const AppsCatalogueTab = () => {
                  <div>
                     <h3 className="font-semibold text-gray-100 flex items-center gap-2">
                        {app.name}
-                       {app.is_featured && <span className="text-[10px] bg-amber-500/10 text-amber-500 px-1.5 py-0.5 rounded border border-amber-500/20 font-bold uppercase">Featured</span>}
+                       {app.is_featured && <span className="text-[10px] bg-amber-500/10 text-amber-500 px-1.5 py-0.5 rounded border border-amber-500/20 font-bold uppercase">À la une</span>}
+                       {app.is_offer_of_the_year && <span className="text-[10px] bg-emerald-500/10 text-emerald-500 px-1.5 py-0.5 rounded border border-emerald-500/20 font-bold uppercase">Offre de l'année</span>}
                     </h3>
                     <p className="text-xs text-gray-400 font-mono mt-1">{app.slug}</p>
                  </div>
@@ -438,7 +465,12 @@ const AppsCatalogueTab = () => {
                   <h2 className="text-2xl font-bold text-white">{selectedApp.name}</h2>
                   {selectedApp.is_featured && (
                     <span className="flex items-center gap-1 bg-amber-500/20 text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-500/30 uppercase tracking-wider">
-                      <Star size={10} fill="currentColor" /> Featured
+                      <Star size={10} fill="currentColor" /> À la une
+                    </span>
+                  )}
+                  {selectedApp.is_offer_of_the_year && (
+                    <span className="flex items-center gap-1 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/30 uppercase tracking-wider ml-2">
+                      <Tag size={10} /> Offre de l'année
                     </span>
                   )}
                 </div>
@@ -478,7 +510,7 @@ const AppsCatalogueTab = () => {
 
                 {/* Dropdown Menu */}
                 {isAppMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-xl shadow-xl shadow-black/50 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-xl shadow-xl shadow-black/50 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                      <div className="py-1">
                         <button 
                            onClick={handleEditAppClick}
@@ -497,7 +529,14 @@ const AppsCatalogueTab = () => {
                            className="w-full text-left px-4 py-2.5 text-sm text-amber-400 hover:bg-amber-500/10 transition-colors flex items-center gap-2"
                         >
                            <Star size={16} fill={selectedApp.is_featured ? 'currentColor' : 'none'} /> 
-                           {selectedApp.is_featured ? 'Unfeature App' : 'Feature Application'}
+                           {selectedApp.is_featured ? 'Enlever de "À la une"' : 'Mettre "À la une"'}
+                        </button>
+                        <button 
+                           onClick={handleToggleOfferOfYear}
+                           className="w-full text-left px-4 py-2.5 text-sm text-emerald-400 hover:bg-emerald-500/10 transition-colors flex items-center gap-2"
+                        >
+                           <Tag size={16} fill={selectedApp.is_offer_of_the_year ? 'currentColor' : 'none'} /> 
+                           {selectedApp.is_offer_of_the_year ? 'Enlever de "Offre de l\'année"' : 'Mettre "Offre de l\'année"'}
                         </button>
                         <div className="h-px bg-gray-700 my-1"></div>
                         <button 
@@ -613,18 +652,22 @@ const AppsCatalogueTab = () => {
              <textarea value={newApp.description} onChange={e => setNewApp({...newApp, description: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-violet-500 focus:border-violet-500 h-24" placeholder="Brief description of the application..." />
            </div>
            <div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">Base Price ($) / Year</label>
                 <input type="number" min="0" step="0.01" value={newApp.basePrice} onChange={e => setNewApp({...newApp, basePrice: parseFloat(e.target.value) || 0})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-violet-500 focus:border-violet-500" placeholder="0.00" />
               </div>
               <div className="flex items-center pt-6">
                 <input type="checkbox" id="isFeatured" checked={newApp.isFeatured} onChange={e => setNewApp({...newApp, isFeatured: e.target.checked})} className="w-4 h-4 rounded border-gray-600 text-amber-500 focus:ring-amber-500 bg-gray-800" />
-                <label htmlFor="isFeatured" className="ml-2 text-sm text-amber-400 font-semibold cursor-pointer">Mettre en avant (Featured)</label>
+                <label htmlFor="isFeatured" className="ml-2 text-sm text-amber-400 font-semibold cursor-pointer">À la une</label>
+              </div>
+              <div className="flex items-center pt-6">
+                <input type="checkbox" id="isOfferOfTheYear" checked={newApp.isOfferOfTheYear} onChange={e => setNewApp({...newApp, isOfferOfTheYear: e.target.checked})} className="w-4 h-4 rounded border-gray-600 text-emerald-500 focus:ring-emerald-500 bg-gray-800" />
+                <label htmlFor="isOfferOfTheYear" className="ml-2 text-sm text-emerald-400 font-semibold cursor-pointer">Offre de l'année</label>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1 flex items-center gap-2">
                      <Box size={14} className="text-violet-400" /> Logo (SVG Code)
@@ -657,7 +700,7 @@ const AppsCatalogueTab = () => {
                </div>
             </div>
 
-            <div className="bg-violet-500/10 border border-violet-500/20 p-4 rounded-xl flex items-start gap-3 mt-2">
+            <div className="bg-violet-500/10 border border-violet-500/20 p-4 rounded-xl flex items-start gap-3 mt-4">
                <input type="checkbox" id="isMobile" checked={newApp.isMobile} onChange={e => setNewApp({...newApp, isMobile: e.target.checked})} className="mt-1 w-4 h-4 rounded border-gray-600 text-violet-500 focus:ring-violet-500 bg-gray-800" />
                <div>
                   <label htmlFor="isMobile" className="text-violet-400 font-semibold cursor-pointer block">Mobile Application</label>

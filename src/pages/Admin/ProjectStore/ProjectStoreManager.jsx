@@ -6,11 +6,14 @@ import CustomersTab from './components/CustomersTab';
 import LicensesTab from './components/LicensesTab';
 import PromotionsTab from './components/PromotionsTab';
 import BundlesTab from './components/BundlesTab';
+import ReviewsTab from './components/ReviewsTab';
+import { MessageSquare } from 'lucide-react';
 
 const tabs = [
   { id: 'catalogue', label: 'Catalogue', icon: Layers, desc: 'Apps & Modules' },
   { id: 'releases', label: 'Releases', icon: Rocket, desc: 'Versions & Files' },
   { id: 'customers', label: 'Tenants', icon: Users, desc: 'Schools & Hubs' },
+  { id: 'reviews', label: 'Avis', icon: MessageSquare, desc: 'Communauté' },
   { id: 'licenses', label: 'Licenses', icon: Key, desc: 'Access Rights' },
   { id: 'promotions', label: 'Promotions', icon: Tag, desc: 'Discount Codes' },
   { id: 'bundles', label: 'Packs', icon: Package, desc: 'Bundle Offers' },
@@ -27,6 +30,8 @@ const ProjectStoreManager = () => {
         return <ReleasesTab />;
       case 'customers':
         return <CustomersTab />;
+      case 'reviews':
+        return <ReviewsTab />;
       case 'licenses':
         return <LicensesTab />;
       case 'promotions':

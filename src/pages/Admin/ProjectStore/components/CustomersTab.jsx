@@ -19,6 +19,8 @@ const CustomersTab = () => {
     hubId: '', 
     email: '', 
     phone: '', 
+    industry: '',
+    country: '',
     isActive: true,
   });
 
@@ -51,7 +53,7 @@ const CustomersTab = () => {
   }, [fetchData]);
 
   const resetForm = useCallback(() => {
-    setNewTenant({ id: '', name: '', hubId: '', email: '', phone: '', isActive: true });
+    setNewTenant({ id: '', name: '', hubId: '', email: '', phone: '', industry: '', country: '', isActive: true });
   }, []);
 
   const handleToggleTenantStatus = async (tenantId, currentStatus) => {
@@ -87,6 +89,8 @@ const CustomersTab = () => {
             name: newTenant.name,
             contact_email: newTenant.email,
             contact_phone: newTenant.phone,
+            industry: newTenant.industry,
+            country: newTenant.country,
             hub_id: newTenant.hubId,
             is_active: newTenant.isActive
           })
@@ -106,6 +110,8 @@ const CustomersTab = () => {
           t_name: newTenant.name,
           t_email: newTenant.email,
           t_phone: newTenant.phone,
+          t_industry: newTenant.industry,
+          t_country: newTenant.country,
           t_password: 'admin@1234',
           t_hub_id: newTenant.hubId || null
         });
@@ -143,6 +149,8 @@ const CustomersTab = () => {
       hubId: tenant.hub_id || '',
       email: tenant.contact_email || '',
       phone: tenant.contact_phone || '',
+      industry: tenant.industry || '',
+      country: tenant.country || '',
       isActive: tenant.is_active,
     });
     setIsTenantModalOpen(true);
@@ -210,7 +218,7 @@ const CustomersTab = () => {
           <button 
             onClick={() => {
               setIsEditTenantMode(false);
-              setNewTenant({ id: null, name: '', hubId: '', email: '', phone: '', isActive: true });
+              setNewTenant({ id: null, name: '', hubId: '', email: '', phone: '', industry: '', country: '', isActive: true });
               setIsTenantModalOpen(true);
             }}
             className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl transition-colors whitespace-nowrap shadow-lg shadow-emerald-600/20 font-medium"
@@ -243,6 +251,9 @@ const CustomersTab = () => {
                <div>
                  <h3 className="text-lg font-bold text-white mb-1">{customer.name}</h3>
                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-xs text-gray-400 bg-gray-900 px-2 py-1 rounded border border-gray-700">
+                       {customer.industry || 'No Industry'} • {customer.country || 'No Country'}
+                    </span>
                     <span className="font-mono text-xs bg-gray-900 px-2 py-1 rounded text-violet-300 border border-gray-700 flex items-center gap-2 group/hubid">
                        Hub ID: {customer.hub_id}
                        <button 
@@ -252,10 +263,6 @@ const CustomersTab = () => {
                        >
                          <Copy size={12} />
                        </button>
-                    </span>
-                    <span className="text-xs text-gray-500 flex items-center gap-1">
-                       <div className={`w-2 h-2 rounded-full ${customer.is_active ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
-                       Seen: {customer.last_sync_at ? new Date(customer.last_sync_at).toLocaleDateString() : 'Never'}
                     </span>
                  </div>
                </div>
@@ -310,9 +317,20 @@ const CustomersTab = () => {
         title={isEditTenantMode ? "Edit Tenant" : "Register New Tenant"}
       >
         <form className="space-y-4" onSubmit={handleCreateTenant}>
+           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Tenant Name <span className="text-red-500">*</span></label>
+                <input type="text" required value={newTenant.name} onChange={e => setNewTenant({...newTenant, name: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-emerald-500 focus:border-emerald-500" placeholder="e.g. Lycée d'Excellence" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Industry / Sector</label>
+                <input type="text" value={newTenant.industry} onChange={e => setNewTenant({...newTenant, industry: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-emerald-500 focus:border-emerald-500" placeholder="e.g. Éducation, Santé" />
+              </div>
+           </div>
+
            <div>
-             <label className="block text-sm font-medium text-gray-300 mb-1">Tenant Name (School/Clinic) <span className="text-red-500">*</span></label>
-             <input type="text" required value={newTenant.name} onChange={e => setNewTenant({...newTenant, name: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-emerald-500 focus:border-emerald-500" placeholder="e.g. Lycée d'Excellence" />
+              <label className="block text-sm font-medium text-gray-300 mb-1">Country</label>
+              <input type="text" value={newTenant.country} onChange={e => setNewTenant({...newTenant, country: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-emerald-500 focus:border-emerald-500" placeholder="e.g. Sénégal, France" />
            </div>
 
            {!isEditTenantMode && (
@@ -331,41 +349,41 @@ const CustomersTab = () => {
            )}
 
            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-             <div>
-               <label className="block text-sm font-medium text-gray-300 mb-1">Contact Email <span className="text-red-500">*</span></label>
-               <input type="email" required value={newTenant.email} onChange={e => setNewTenant({...newTenant, email: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-emerald-500 focus:border-emerald-500" placeholder="admin@school.com" />
-             </div>
-             <div>
-               <label className="block text-sm font-medium text-gray-300 mb-1">Phone Number</label>
-               <input type="tel" value={newTenant.phone} onChange={e => setNewTenant({...newTenant, phone: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-emerald-500 focus:border-emerald-500" placeholder="+1 234 567 890" />
-             </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Contact Email <span className="text-red-500">*</span></label>
+                <input type="email" required value={newTenant.email} onChange={e => setNewTenant({...newTenant, email: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-emerald-500 focus:border-emerald-500" placeholder="admin@school.com" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Phone Number</label>
+                <input type="tel" value={newTenant.phone} onChange={e => setNewTenant({...newTenant, phone: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-emerald-500 focus:border-emerald-500" placeholder="+1 234 567 890" />
+              </div>
            </div>
 
            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-             <div>
-               <label className="block text-sm font-medium text-gray-300 mb-1">EtherNanos Hub ID {isEditTenantMode ? '' : '(Optional)'}</label>
-               <div className="relative">
-                 <input 
-                   type="text" 
-                   disabled={isEditTenantMode} 
-                   value={newTenant.hubId} 
-                   onChange={e => setNewTenant({...newTenant, hubId: e.target.value})} 
-                   className={`w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white font-mono text-sm focus:ring-emerald-500 focus:border-emerald-500 ${isEditTenantMode ? 'opacity-50 cursor-not-allowed' : ''}`} 
-                   placeholder="e.g. ETH-NANOS-XXXXXX" 
-                 />
-                 {isEditTenantMode && (
-                   <button 
-                     type="button"
-                     onClick={() => handleCopyHubId(newTenant.hubId)}
-                     className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-white bg-gray-700 rounded-md transition-colors"
-                     title="Copy Hub ID"
-                   >
-                     <Copy size={14} />
-                   </button>
-                 )}
-               </div>
-               {!isEditTenantMode && <p className="mt-1 text-xs text-gray-500">Leave blank to auto-generate.</p>}
-             </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">EtherNanos Hub ID {isEditTenantMode ? '' : '(Optional)'}</label>
+                <div className="relative">
+                  <input 
+                    type="text" 
+                    disabled={isEditTenantMode} 
+                    value={newTenant.hubId} 
+                    onChange={e => setNewTenant({...newTenant, hubId: e.target.value})} 
+                    className={`w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white font-mono text-sm focus:ring-emerald-500 focus:border-emerald-500 ${isEditTenantMode ? 'opacity-50 cursor-not-allowed' : ''}`} 
+                    placeholder="e.g. ETH-NANOS-XXXXXX" 
+                  />
+                  {isEditTenantMode && (
+                    <button 
+                      type="button"
+                      onClick={() => handleCopyHubId(newTenant.hubId)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-white bg-gray-700 rounded-md transition-colors"
+                      title="Copy Hub ID"
+                    >
+                      <Copy size={14} />
+                    </button>
+                  )}
+                </div>
+                {!isEditTenantMode && <p className="mt-1 text-xs text-gray-500">Leave blank to auto-generate.</p>}
+              </div>
            </div>
            
            <div className="bg-emerald-900/10 border border-emerald-500/20 p-4 rounded-xl flex items-start gap-3 mt-4">
