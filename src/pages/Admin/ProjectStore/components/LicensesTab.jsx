@@ -170,44 +170,75 @@ const LicensesTab = () => {
     if (!selectedCustomerId) return;
     setIsSubmitting(true);
     
+    const customer = customers.find(c => c.id === selectedCustomerId);
+    const moduleObj = modules.find(m => m.id === moduleId);
+    
+    if (!customer || !moduleObj) {
+      setIsSubmitting(false);
+      return;
+    }
+
     const hasAccess = customerLicenses.includes(moduleId);
+    const toastId = toast.loading(`${hasAccess ? 'Révocation' : 'Déblocage'} du module ${moduleObj.name}...`);
     
     try {
+      // 1. Mise à jour de Supabase (Cohérence de l'interface Portfolio)
       if (hasAccess) {
-        // Revoke license
         const { error } = await supabase
           .from('tenant_licenses')
           .delete()
           .eq('tenant_id', selectedCustomerId)
           .eq('module_id', moduleId);
-          
         if (error) throw error;
-        
-        setLicenses(prev => ({
-          ...prev,
-          [selectedCustomerId]: prev[selectedCustomerId].filter(id => id !== moduleId)
-        }));
-        toast.success('License revoked');
       } else {
-        // Grant license
         const { error } = await supabase
           .from('tenant_licenses')
           .insert([{
             tenant_id: selectedCustomerId,
             module_id: moduleId
           }]);
-          
         if (error) throw error;
-        
-        setLicenses(prev => ({
-          ...prev,
-          [selectedCustomerId]: [...(prev[selectedCustomerId] || []), moduleId]
-        }));
-        toast.success('License granted');
       }
+
+      // 2. Appel au Bridge Django (Synchronisation BDD Centrale)
+      const apiUrl = import.meta.env.VITE_SCHOOL_MANAGE_API_URL;
+      const apiKey = import.meta.env.VITE_HUB_API_KEY;
+      
+      if (apiUrl && apiKey && moduleObj.code) {
+        const normalizedApiUrl = apiUrl.replace(/\/api\/?$/, '').replace(/\/+$/, '');
+        const hubId = customer.hub_id || customer.hubId || `ETH-NANOS-${customer.id.replace(/-/g, '').slice(0, 8).toUpperCase()}`;
+
+        const response = await fetch(`${normalizedApiUrl}/api/external/unlock-module/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Hub-Api-Key': apiKey
+          },
+          body: JSON.stringify({
+            tenant_id: hubId,
+            module_code: moduleObj.code,
+            is_active: !hasAccess
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Erreur lors de la synchronisation avec Django Cloud');
+        }
+      }
+
+      // 3. Mise à jour de l'état local React
+      setLicenses(prev => ({
+        ...prev,
+        [selectedCustomerId]: hasAccess
+          ? prev[selectedCustomerId].filter(id => id !== moduleId)
+          : [...(prev[selectedCustomerId] || []), moduleId]
+      }));
+
+      toast.success(hasAccess ? 'Licence révoquée avec succès !' : 'Licence accordée avec succès !', { id: toastId });
     } catch (error) {
       console.error('Error toggling license:', error);
-      toast.error('Failed to change license status');
+      toast.error(`Échec de l'opération : ${error.message || error}`, { id: toastId });
     } finally {
       setIsSubmitting(false);
     }
