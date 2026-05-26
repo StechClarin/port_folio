@@ -151,6 +151,23 @@ const LicensesTab = () => {
         
                 const { error: licenseError } = await supabase.from('tenant_licenses').insert(licenseEntries);
                 if (licenseError) throw licenseError;
+                
+                // Synchronisation avec Django
+                const baseModuleCodes = baseModules.map(m => m.code).filter(Boolean);
+                if (baseModuleCodes.length > 0) {
+                   await fetch(`${normalizedApiUrl}/api/external/unlock-module/`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'X-Hub-Api-Key': apiKey
+                      },
+                      body: JSON.stringify({
+                        hub_id: hubId,
+                        'included-mods': baseModuleCodes,
+                        is_active: true
+                      })
+                   });
+                }
               }
         
               toast.success(`${app.name} activé avec succès ! Compte Admin créé.`, { id: toastId });
@@ -215,7 +232,7 @@ const LicensesTab = () => {
             'X-Hub-Api-Key': apiKey
           },
           body: JSON.stringify({
-            tenant_id: hubId,
+            hub_id: hubId,
             module_code: moduleObj.code,
             is_active: !hasAccess
           })
