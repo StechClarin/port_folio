@@ -123,6 +123,9 @@ const LicensesTab = () => {
               const normalizedApiUrl = apiUrl.replace(/\/api\/?$/, '').replace(/\/+$/, '');
               const hubId = customer.hub_id || customer.hubId || `ETH-NANOS-${customer.id.replace(/-/g, '').slice(0, 8).toUpperCase()}`;
 
+              const baseModules = modules.filter(m => m.app_id === app.id && !m.is_premium);
+              const baseModuleCodes = baseModules.map(m => m.code).filter(Boolean);
+
               const response = await fetch(`${normalizedApiUrl}/api/external/provision-tenant/`, {
                 method: 'POST',
                 headers: {
@@ -133,7 +136,8 @@ const LicensesTab = () => {
                   tenant_id: customer.id,
                   tenant_name: customer.name,
                   hub_id: hubId,
-                  admin_email: customer.contact_email || `${customer.name.toLowerCase().replace(/\s/g, '')}@kanycollege.com`
+                  admin_email: customer.contact_email || `${customer.name.toLowerCase().replace(/\s/g, '')}@kanycollege.com`,
+                  'included-mods': baseModuleCodes
                 })
               });
         
@@ -142,7 +146,6 @@ const LicensesTab = () => {
                 throw new Error(errorData.error || 'Erreur lors du provisioning Django');
               }
         
-              const baseModules = modules.filter(m => m.app_id === app.id && !m.is_premium);
               if (baseModules.length > 0) {
                 const licenseEntries = baseModules.map(m => ({
                   tenant_id: selectedCustomerId,
@@ -151,23 +154,6 @@ const LicensesTab = () => {
         
                 const { error: licenseError } = await supabase.from('tenant_licenses').insert(licenseEntries);
                 if (licenseError) throw licenseError;
-                
-                // Synchronisation avec Django
-                const baseModuleCodes = baseModules.map(m => m.code).filter(Boolean);
-                if (baseModuleCodes.length > 0) {
-                   await fetch(`${normalizedApiUrl}/api/external/unlock-module/`, {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'X-Hub-Api-Key': apiKey
-                      },
-                      body: JSON.stringify({
-                        hub_id: hubId,
-                        'included-mods': baseModuleCodes,
-                        is_active: true
-                      })
-                   });
-                }
               }
         
               toast.success(`${app.name} activé avec succès ! Compte Admin créé.`, { id: toastId });
