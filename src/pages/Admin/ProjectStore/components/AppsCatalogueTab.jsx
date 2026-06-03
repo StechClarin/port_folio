@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { AppWindow, Settings, Search, Plus, Trash2, Box, Smartphone, Check, Calendar, ArrowRight, Loader2, RefreshCw, Power, Edit, Package, Shield, MoreVertical, Save, Star, Image as ImageIcon, Copy } from 'lucide-react';
+import { AppWindow, Settings, Search, Plus, Trash2, Box, Smartphone, Check, Calendar, ArrowRight, Loader2, RefreshCw, Power, Edit, Package, Shield, MoreVertical, Save, Star, Image as ImageIcon, Copy, Tag } from 'lucide-react';
 import StoreModal from './StoreModal';
 import { supabase } from '../../../../lib/supabaseClient';
 import toast from 'react-hot-toast';
@@ -416,7 +416,7 @@ const AppsCatalogueTab = () => {
                  <div className={`w-12 h-12 rounded-lg flex items-center justify-center text-xl font-bold relative
                     ${selectedApp?.id === app.id ? 'bg-violet-600 text-white' : 'bg-gray-700 text-gray-300'}`}>
                     {app.icon_svg ? (
-                       <div dangerouslySetInnerHTML={{ __html: app.icon_svg }} className="w-8 h-8" />
+                       <div dangerouslySetInnerHTML={{ __html: app.icon_svg }} className="w-8 h-8 flex items-center justify-center [&>svg]:w-full [&>svg]:h-full [&>svg]:max-w-full [&>svg]:max-h-full" />
                     ) : (
                        app.name.charAt(0)
                     )}
