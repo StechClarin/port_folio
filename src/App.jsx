@@ -40,6 +40,7 @@ const Portfolio = () => {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
+    window.scrollTo(0, 0);
     const handleScroll = () => {
       setScrolled(window.scrollY > 50);
     };
@@ -117,8 +118,8 @@ function App() {
         <Toaster position="top-right" />
         <Routes>
           {/* Public Routes */}
-          <Route path="/" element={<Portfolio />} />
-          <Route path="/ethernanos" element={<EthernanosDetail />} />
+          <Route path="/portfolio" element={<Portfolio />} />
+          <Route path="/" element={<EthernanosDetail />} />
 
           {/* Admin Routes */}
           <Route path="/admin/login" element={<Login />} />

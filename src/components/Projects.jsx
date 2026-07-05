@@ -48,7 +48,7 @@ const Projects = () => {
       : "Decentralized operating system for business applications. High performance, Rust/Tauri architecture, and secure real-time synchronization.",
     image_url: logoEthernanos,
     technologies: ['Rust', 'Tauri', 'Angular', 'PostgreSQL'],
-    project_url: '/ethernanos',
+    project_url: '/',
     demo_url: null,
     repo_url: 'https://github.com/stechclarin/ethernanos-launcher'
   };
@@ -293,7 +293,7 @@ const ProjectSlotContent = ({ project, isCenter, isFeatured, isMobile, language 
 
           {isMobile && (
              <div className={`flex items-center gap-2 mt-auto pt-2 transition-all duration-1000 ${isCenter ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
-                <Link to={isFeatured ? "/ethernanos" : project.project_url} className={`flex-1 text-center py-2.5 rounded-full font-black text-[10px] uppercase tracking-widest transition-all duration-300 ${isFeatured ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'bg-white text-black shadow-lg'}`}>
+                <Link to={isFeatured ? "/" : project.project_url} className={`flex-1 text-center py-2.5 rounded-full font-black text-[10px] uppercase tracking-widest transition-all duration-300 ${isFeatured ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'bg-white text-black shadow-lg'}`}>
                     {language === 'fr' ? 'DÉCOUVRIR' : 'DISCOVER'}
                 </Link>
                 <a href={project.repo_url} className="p-2.5 bg-white/5 border border-white/10 rounded-full text-white/50" aria-label="GitHub Repository">
@@ -314,7 +314,7 @@ const ProjectSlotContent = ({ project, isCenter, isFeatured, isMobile, language 
           <div className="absolute inset-0 z-20 bg-gradient-to-r from-[#0d0d0d] via-transparent to-transparent -ml-[4px]"></div>
 
           <div className={`absolute bottom-6 md:bottom-10 left-6 right-6 md:left-10 md:right-10 z-30 flex items-center gap-4 md:gap-6 transition-all duration-1000 ${isCenter ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8 pointer-events-none'}`}>
-             <Link to={isFeatured ? "/ethernanos" : project.project_url} className={`flex-1 text-center py-3 md:py-3.5 rounded-full font-black text-[8px] md:text-[9px] uppercase tracking-widest transition-all duration-300 ${isFeatured ? 'bg-amber-500 text-black shadow-[0_0_40px_rgba(245,158,11,0.3)] hover:bg-violet-600 hover:text-white hover:shadow-violet-600/40' : 'bg-white text-black hover:bg-violet-600 hover:text-white hover:shadow-violet-600/40 shadow-xl'}`}>
+             <Link to={isFeatured ? "/" : project.project_url} className={`flex-1 text-center py-3 md:py-3.5 rounded-full font-black text-[8px] md:text-[9px] uppercase tracking-widest transition-all duration-300 ${isFeatured ? 'bg-amber-500 text-black shadow-[0_0_40px_rgba(245,158,11,0.3)] hover:bg-violet-600 hover:text-white hover:shadow-violet-600/40' : 'bg-white text-black hover:bg-violet-600 hover:text-white hover:shadow-violet-600/40 shadow-xl'}`}>
                 {language === 'fr' ? 'EXPLORER' : 'EXPLORE'} <ArrowRight className="inline-block ml-1 md:ml-2" size={12} md={14} />
              </Link>
              <a href={project.repo_url} className="p-3 bg-white/5 backdrop-blur-xl border border-white/10 rounded-full text-white/50 hover:text-white transition-all transform hover:scale-110 shadow-lg group" aria-label="GitHub Repository">
@@ -349,7 +349,7 @@ const ProjectCard = ({ project, isMobile, language }) => {
             ))}
         </div>
         <div className="flex items-center gap-6">
-          <Link to={isFeatured ? "/ethernanos" : project.project_url} className={`flex-1 text-center py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${isFeatured ? 'bg-amber-500 text-black shadow-lg hover:bg-violet-600 hover:text-white' : 'bg-white text-black hover:bg-violet-600 hover:text-white'}`}>
+          <Link to={isFeatured ? "/" : project.project_url} className={`flex-1 text-center py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${isFeatured ? 'bg-amber-500 text-black shadow-lg hover:bg-violet-600 hover:text-white' : 'bg-white text-black hover:bg-violet-600 hover:text-white'}`}>
             {language === 'fr' ? 'Découvrir' : 'Explore'}
           </Link>
           <a href={project.repo_url} className="p-3.5 border border-white/5 rounded-2xl text-gray-500 hover:text-white transition-colors" aria-label="GitHub Repository">
