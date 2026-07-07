@@ -19,6 +19,7 @@ import About from './components/About';
 import Footer from './components/Footer';
 import FloatingActions from './components/FloatingActions';
 import SectionWrapper from './components/SectionWrapper';
+import Chatbot from './components/Chatbot';
 
 // Admin Components
 import Login from './pages/Admin/Login';
@@ -116,6 +117,7 @@ function App() {
     <LanguageProvider>
       <Router>
         <Toaster position="top-right" />
+        <Chatbot />
         <Routes>
           {/* Public Routes */}
           <Route path="/portfolio" element={<Portfolio />} />
