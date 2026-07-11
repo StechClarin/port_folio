@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, ArrowRight, ChevronLeft, ChevronRight, LayoutGrid, List, Github, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import logoEthernanos from '../assets/logo-ethernanos.png';
+import logoEthernanos from '../assets/ethernanos-icon.png';
 import { useLanguage } from '../context/LanguageContext';
 
 import { usePortfolioData } from '../hooks/usePortfolioData';

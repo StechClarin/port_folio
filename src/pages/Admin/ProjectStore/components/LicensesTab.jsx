@@ -220,7 +220,8 @@ const LicensesTab = () => {
           body: JSON.stringify({
             hub_id: hubId,
             module_code: moduleObj.code,
-            is_active: !hasAccess
+            is_active: !hasAccess,
+            allowed_pages: moduleObj.allowed_pages || []
           })
         });
 

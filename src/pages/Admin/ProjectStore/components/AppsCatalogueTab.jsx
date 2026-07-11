@@ -37,7 +37,7 @@ const AppsCatalogueTab = () => {
     builder: '',
     cloudApiUrl: ''
   });
-  const [newModule, setNewModule] = useState({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0 });
+  const [newModule, setNewModule] = useState({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0, allowed_pages: '' });
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -267,7 +267,8 @@ const AppsCatalogueTab = () => {
             icon: newModule.icon,
             description: newModule.description,
             is_premium: newModule.isPremium,
-            price: newModule.isPremium ? newModule.price : 0
+            price: newModule.isPremium ? newModule.price : 0,
+            allowed_pages: newModule.allowed_pages ? newModule.allowed_pages.split(',').map(p => p.trim()).filter(Boolean) : []
           })
           .eq('id', newModule.id)
           .select()
@@ -278,7 +279,7 @@ const AppsCatalogueTab = () => {
         setModules(modules.map(m => m.id === data.id ? data : m));
         setIsModuleModalOpen(false);
         setIsEditModuleMode(false);
-        setNewModule({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0 });
+        setNewModule({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0, allowed_pages: '' });
         toast.success('Module updated successfully!');
       } else {
         const { data, error } = await supabase
@@ -290,7 +291,8 @@ const AppsCatalogueTab = () => {
             icon: newModule.icon,
             description: newModule.description,
             is_premium: newModule.isPremium,
-            price: newModule.isPremium ? newModule.price : 0
+            price: newModule.isPremium ? newModule.price : 0,
+            allowed_pages: newModule.allowed_pages ? newModule.allowed_pages.split(',').map(p => p.trim()).filter(Boolean) : []
           }])
           .select()
           .single();
@@ -299,7 +301,7 @@ const AppsCatalogueTab = () => {
 
         setModules([...modules, data]);
         setIsModuleModalOpen(false);
-        setNewModule({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0 });
+        setNewModule({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0, allowed_pages: '' });
         toast.success('Module added successfully!');
       }
     } catch (error) {
@@ -319,7 +321,8 @@ const AppsCatalogueTab = () => {
       icon: mod.icon || '',
       description: mod.description,
       isPremium: mod.is_premium,
-      price: mod.price || 0
+      price: mod.price || 0,
+      allowed_pages: mod.allowed_pages ? mod.allowed_pages.join(', ') : ''
     });
     setIsModuleModalOpen(true);
   };
@@ -557,7 +560,7 @@ const AppsCatalogueTab = () => {
                 <button 
                   onClick={() => {
                     setIsEditModuleMode(false);
-                    setNewModule({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0 });
+                    setNewModule({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0, allowed_pages: '' });
                     setIsModuleModalOpen(true);
                   }}
                   className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg border border-gray-600 transition-colors text-sm"
@@ -600,6 +603,16 @@ const AppsCatalogueTab = () => {
                      <p className="text-sm text-gray-400 line-clamp-2">
                         {mod.description}
                      </p>
+                     
+                     {mod.allowed_pages && mod.allowed_pages.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-1">
+                           {mod.allowed_pages.map((page, idx) => (
+                              <span key={idx} className="text-[10px] bg-gray-700 text-gray-300 px-2 py-0.5 rounded-full border border-gray-600">
+                                 {page}
+                              </span>
+                           ))}
+                        </div>
+                     )}
                      
                      <div className="mt-4 pt-4 border-t border-gray-700 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={() => handleDeleteModule(mod.id, mod.name)} className="text-sm text-red-500 hover:text-red-400 transition-colors flex items-center gap-1"><Trash2 size={14}/> Delete</button>
@@ -770,6 +783,12 @@ const AppsCatalogueTab = () => {
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1">Description</label>
               <textarea value={newModule.description} onChange={e => setNewModule({...newModule, description: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-violet-500 focus:border-violet-500 h-20" placeholder="What does this module do?" />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Pages Autorisées (Tags)</label>
+              <input type="text" value={newModule.allowed_pages} onChange={e => setNewModule({...newModule, allowed_pages: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-violet-500 focus:border-violet-500" placeholder="e.g. classroom, planning, subject (Séparés par des virgules. Laisser vide = toutes les pages)" />
+              <p className="text-xs text-gray-500 mt-1">Si laissé vide, le module donnera accès à toutes ses pages par défaut.</p>
             </div>
            
            <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl flex flex-col gap-3 mt-2">
