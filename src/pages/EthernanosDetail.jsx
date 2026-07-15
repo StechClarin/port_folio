@@ -336,22 +336,22 @@ const EthernanosDetail = () => {
             
             {/* Desktop Download Buttons */}
             <div className="hidden md:flex flex-wrap justify-center gap-4 mt-8">
-              <a href="https://github.com/StechClarin/DesktopLauncherApp/releases/download/v1.0.50/EtherNanos.Hub_0.1.0_x64-setup.exe" className="group/btn flex items-center gap-3 px-6 py-4 bg-white text-slate-900 rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-105 transition-all shadow-[0_0_30px_rgba(255,255,255,0.2)] hover:shadow-[0_0_50px_rgba(255,255,255,0.4)] w-full sm:w-auto justify-center">
+              <a href="https://github.com/StechClarin/DesktopLauncherApp/releases/download/v0.1.0/EtherNanos.Hub_0.1.0_x64-setup.exe" className="group/btn flex items-center gap-3 px-6 py-4 bg-white text-slate-900 rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-105 transition-all shadow-[0_0_30px_rgba(255,255,255,0.2)] hover:shadow-[0_0_50px_rgba(255,255,255,0.4)] w-full sm:w-auto justify-center">
                 <Download size={20} className="group-hover/btn:-translate-y-1 transition-transform" />
                 Windows (.exe)
               </a>
               
-              <a href="https://github.com/StechClarin/DesktopLauncherApp/releases/download/v1.0.50/EtherNanos.Hub_0.1.0_universal.dmg" className="group/btn flex items-center gap-3 px-6 py-4 bg-slate-800 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-slate-700 hover:scale-105 transition-all border border-white/10 w-full sm:w-auto justify-center shadow-lg">
+              <a href="https://github.com/StechClarin/DesktopLauncherApp/releases/download/v0.1.0/EtherNanos.Hub_0.1.0_universal.dmg" className="group/btn flex items-center gap-3 px-6 py-4 bg-slate-800 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-slate-700 hover:scale-105 transition-all border border-white/10 w-full sm:w-auto justify-center shadow-lg">
                 <Download size={20} className="text-slate-400 group-hover/btn:text-white group-hover/btn:-translate-y-1 transition-all" />
                 macOS (.dmg)
               </a>
 
-              <a href="https://github.com/StechClarin/DesktopLauncherApp/releases/download/v1.0.50/EtherNanos.Hub_0.1.0_amd64.deb" className="group/btn flex items-center gap-3 px-6 py-4 bg-slate-900 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-slate-800 hover:scale-105 transition-all border border-white/10 w-full sm:w-auto justify-center shadow-lg">
+              <a href="https://github.com/StechClarin/DesktopLauncherApp/releases/download/v0.1.0/EtherNanos.Hub_0.1.0_amd64.deb" className="group/btn flex items-center gap-3 px-6 py-4 bg-slate-900 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-slate-800 hover:scale-105 transition-all border border-white/10 w-full sm:w-auto justify-center shadow-lg">
                 <Download size={20} className="text-slate-500 group-hover/btn:text-white group-hover/btn:-translate-y-1 transition-all" />
                 Linux (.deb)
               </a>
 
-              <a href="https://github.com/StechClarin/DesktopLauncherApp/releases/download/v1.0.50/EtherNanos.Hub_universal.app.tar.gz" className="group/btn flex items-center gap-3 px-6 py-4 bg-slate-900/50 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-slate-800 hover:scale-105 transition-all border border-white/5 w-full sm:w-auto justify-center">
+              <a href="https://github.com/StechClarin/DesktopLauncherApp/releases/download/v0.1.0/EtherNanos.Hub_universal.app.tar.gz" className="group/btn flex items-center gap-3 px-6 py-4 bg-slate-900/50 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-slate-800 hover:scale-105 transition-all border border-white/5 w-full sm:w-auto justify-center">
                 <Download size={20} className="text-slate-600 group-hover/btn:text-white group-hover/btn:-translate-y-1 transition-all" />
                 Linux (.tar.gz)
               </a>

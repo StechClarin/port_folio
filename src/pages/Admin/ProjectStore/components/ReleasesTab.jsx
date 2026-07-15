@@ -94,6 +94,18 @@ const ReleasesTab = () => {
       const newPlatformData = {};
       let version = newRelease.version;
 
+      // Extract base directory if user provided a specific metadata JSON file URL
+      let baseUrl = newRelease.metadataBaseUrl.trim();
+      if (
+        baseUrl.toLowerCase().endsWith('/metadata-linux.json') ||
+        baseUrl.toLowerCase().endsWith('/metadata-win.json') ||
+        baseUrl.toLowerCase().endsWith('/metadata-mac.json')
+      ) {
+        baseUrl = baseUrl.substring(0, baseUrl.lastIndexOf('/'));
+      } else if (baseUrl.toLowerCase().endsWith('.json')) {
+        baseUrl = baseUrl.substring(0, baseUrl.lastIndexOf('/'));
+      }
+
       // Fetch metadata for each selected platform
       for (const platform of newRelease.platforms) {
         const metadataFileName = 
@@ -106,7 +118,7 @@ const ReleasesTab = () => {
           continue;
         }
 
-        const metadataUrl = `${newRelease.metadataBaseUrl.replace(/\/+$/,'')}/${metadataFileName}`;
+        const metadataUrl = `${baseUrl.replace(/\/+$/,'')}/${metadataFileName}`;
         console.log(`Fetching metadata for ${platform} from ${metadataUrl}`);
 
         const response = await fetch(metadataUrl);
@@ -116,7 +128,7 @@ const ReleasesTab = () => {
 
         const data = await response.json();
         
-        const normalizedBaseUrl = newRelease.metadataBaseUrl.replace(/\/+$/,'') + '/';
+        const normalizedBaseUrl = baseUrl.replace(/\/+$/,'') + '/';
         const computedDownloadUrl = new URL(data.archive || '', normalizedBaseUrl).toString();
 
         newPlatformData[platform] = {
@@ -133,13 +145,18 @@ const ReleasesTab = () => {
       setPlatformData(newPlatformData);
       setNewRelease(prev => ({
         ...prev,
+        metadataBaseUrl: baseUrl,
         version: version || prev.version
       }));
 
       toast.success(`Métadonnées récupérées pour ${newRelease.platforms.length} plateforme(s) !`);
     } catch (err) {
       console.error('Metadata fetch error:', err);
-      toast.error(`Erreur lors de la lecture des métadonnées: ${err.message}`);
+      if (err.name === 'TypeError' || err.message.includes('fetch') || err.message.includes('NetworkError')) {
+        toast.error(`Erreur CORS / Réseau : Le serveur distant bloque la requête. Vous pouvez remplir les détails manuellement ci-dessous.`);
+      } else {
+        toast.error(`Erreur lors de la lecture des métadonnées: ${err.message}`);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -155,7 +172,7 @@ const ReleasesTab = () => {
     // Verify all platforms have metadata
     for (const platform of newRelease.platforms) {
       if (!platformData[platform]?.checksum || !platformData[platform]?.downloadUrl) {
-        toast.error(`Métadonnées manquantes pour ${platform}. Veuillez fetcher les métadonnées.`);
+        toast.error(`Métadonnées manquantes pour ${platform}. Veuillez les remplir ou fetcher les métadonnées.`);
         return;
       }
     }
@@ -568,23 +585,41 @@ const ReleasesTab = () => {
                    <div key={platform} className="bg-gray-900/50 border border-gray-700/50 p-3 rounded-lg space-y-2">
                      <div className="font-mono text-xs text-gray-400">{platformLabel}</div>
                      <div>
-                       <label className="block text-xs text-gray-400 mb-1">Download URL</label>
-                       <input 
-                         type="url"
-                         readOnly
-                         value={data?.downloadUrl || ''}
-                         className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-white text-xs font-mono opacity-75"
-                       />
-                     </div>
-                     <div>
-                       <label className="block text-xs text-gray-400 mb-1">SHA-256 Checksum</label>
-                       <input 
-                         type="text"
-                         readOnly
-                         value={data?.checksum || ''}
-                         className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-white text-xs font-mono opacity-75"
-                       />
-                     </div>
+                        <label className="block text-xs text-gray-400 mb-1">Download URL</label>
+                        <input 
+                          type="url"
+                          value={data?.downloadUrl || ''}
+                          onChange={(e) => {
+                            setPlatformData(prev => ({
+                              ...prev,
+                              [platform]: {
+                                ...(prev[platform] || {}),
+                                downloadUrl: e.target.value
+                              }
+                            }));
+                          }}
+                          className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-white text-xs font-mono focus:ring-violet-500 focus:border-violet-500"
+                          placeholder="https://example.com/archive.zip"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">SHA-256 Checksum</label>
+                        <input 
+                          type="text"
+                          value={data?.checksum || ''}
+                          onChange={(e) => {
+                            setPlatformData(prev => ({
+                              ...prev,
+                              [platform]: {
+                                ...(prev[platform] || {}),
+                                checksum: e.target.value
+                              }
+                            }));
+                          }}
+                          className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-white text-xs font-mono focus:ring-violet-500 focus:border-violet-500"
+                          placeholder="sha256 checksum"
+                        />
+                      </div>
                    </div>
                  );
                })}
