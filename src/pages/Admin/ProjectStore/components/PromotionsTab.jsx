@@ -70,7 +70,7 @@ const PromotionsTab = () => {
       if (promoError && promoError.code !== '42P01') throw promoError;
 
       const { data: appsData } = await supabase.from('apps').select('id, name').order('name');
-      const { data: modulesData } = await supabase.from('app_modules').select('id, name, app_id').order('name');
+      const { data: modulesData } = await supabase.from('app_modules').select('id, name, app_id, tier').order('name');
 
       setPromotions(promoData || []);
       setApps(appsData || []);
@@ -251,7 +251,10 @@ const PromotionsTab = () => {
           return promo.app_ids.map(id => apps.find(a => a.id === id)?.name).filter(Boolean).join(', ');
       }
       if (promo.module_ids?.length > 0) {
-          return promo.module_ids.map(id => modules.find(m => m.id === id)?.name).filter(Boolean).join(', ');
+          return promo.module_ids.map(id => {
+            const m = modules.find(m => m.id === id);
+            return m ? `${m.name}${m.tier ? ` (${m.tier.toUpperCase()})` : ''}` : null;
+          }).filter(Boolean).join(', ');
       }
       return 'Aucune cible';
   };
@@ -457,7 +460,9 @@ const PromotionsTab = () => {
                                   <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${currentSelectionIds.includes(t.id) ? 'bg-pink-600 border-pink-600 scale-110' : 'border-gray-600 group-hover:border-gray-500'}`}>
                                      {currentSelectionIds.includes(t.id) && <Check size={14} className="text-white" />}
                                   </div>
-                                  <span className={`text-sm ${currentSelectionIds.includes(t.id) ? 'text-white font-black' : 'text-gray-400'}`}>{t.name}</span>
+                                  <span className={`text-sm ${currentSelectionIds.includes(t.id) ? 'text-white font-black' : 'text-gray-400'}`}>
+                                      {t.name} {t.tier && <span className="text-[10px] bg-gray-950 px-1.5 py-0.5 rounded text-gray-500 uppercase font-mono font-bold ml-2">({t.tier})</span>}
+                                   </span>
                                </div>
                             ))}
                             {filteredTargets.length === 0 && <div className="p-8 text-center text-xs text-gray-600 italic">Aucun produit ne correspond.</div>}

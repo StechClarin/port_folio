@@ -73,7 +73,7 @@ const BundlesTab = () => {
       // 4. Fetch Modules (for selection)
       const { data: modulesData, error: modulesError } = await supabase
         .from('app_modules')
-        .select('id, name, app_id');
+        .select('id, name, app_id, tier, code');
       if (modulesError) throw modulesError;
 
       // Group items by bundleId
@@ -324,7 +324,7 @@ const BundlesTab = () => {
                      </div>
                      <div className="flex -space-x-2">
                         {(bundleItems[bundle.id] || []).slice(0, 3).map((modId, i) => (
-                          <div key={i} title={modules.find(m => m.id === modId)?.name} className="w-8 h-8 rounded-full bg-gray-900 border-2 border-gray-800 flex items-center justify-center text-xs text-yellow-400 font-bold">
+                          <div key={i} title={modules.find(m => m.id === modId) ? `${modules.find(m => m.id === modId).name} (${modules.find(m => m.id === modId).tier || 'starter'})` : ''} className="w-8 h-8 rounded-full bg-gray-900 border-2 border-gray-800 flex items-center justify-center text-xs text-yellow-400 font-bold">
                              {modules.find(m => m.id === modId)?.name?.charAt(0) || '?'}
                           </div>
                         ))}
@@ -470,7 +470,7 @@ const BundlesTab = () => {
                                       <Check size={12} className="stroke-[3]" />
                                   </div>
                                   <span className={`text-sm font-medium ${isSelected ? 'text-white' : 'text-gray-400 group-hover:text-gray-300'}`}>
-                                    {mod.name}
+                                    {mod.name} {mod.tier && <span className="text-[10px] bg-gray-900 px-1.5 py-0.5 rounded text-gray-500 uppercase font-mono font-bold ml-2 border border-gray-800">({mod.tier})</span>}
                                   </span>
                                 </div>
                             </div>

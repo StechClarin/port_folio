@@ -356,8 +356,13 @@ const LicensesTab = () => {
                                        {hasAccess ? <Check size={20} className="stroke-[3]"/> : <X size={20} />}
                                     </div>
                                     <div>
-                                       <h4 className={`font-semibold  ${hasAccess ? 'text-emerald-100' : 'text-gray-300'}`}>
+                                       <h4 className={`font-semibold flex items-center gap-2 ${hasAccess ? 'text-emerald-100' : 'text-gray-300'}`}>
                                           {module.name}
+                                          {module.tier && (
+                                            <span className="text-[9px] bg-gray-950 px-1.5 py-0.5 rounded text-gray-400 uppercase font-mono font-bold border border-gray-800">
+                                              {module.tier}
+                                            </span>
+                                          )}
                                        </h4>
                                        {module.is_premium ? (
                                           <span className="text-[10px] font-bold uppercase tracking-wider text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 mt-1 inline-block">

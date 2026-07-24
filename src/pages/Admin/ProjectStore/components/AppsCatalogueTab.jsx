@@ -37,7 +37,7 @@ const AppsCatalogueTab = () => {
     builder: '',
     cloudApiUrl: ''
   });
-  const [newModule, setNewModule] = useState({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0, allowed_pages: '' });
+  const [newModule, setNewModule] = useState({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0, allowed_pages: '', tier: 'starter' });
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -268,7 +268,8 @@ const AppsCatalogueTab = () => {
             description: newModule.description,
             is_premium: newModule.isPremium,
             price: newModule.isPremium ? newModule.price : 0,
-            allowed_pages: newModule.allowed_pages ? newModule.allowed_pages.split(',').map(p => p.trim()).filter(Boolean) : []
+            allowed_pages: newModule.allowed_pages ? newModule.allowed_pages.split(',').map(p => p.trim()).filter(Boolean) : [],
+            tier: newModule.tier || 'starter'
           })
           .eq('id', newModule.id)
           .select()
@@ -279,7 +280,7 @@ const AppsCatalogueTab = () => {
         setModules(modules.map(m => m.id === data.id ? data : m));
         setIsModuleModalOpen(false);
         setIsEditModuleMode(false);
-        setNewModule({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0, allowed_pages: '' });
+        setNewModule({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0, allowed_pages: '', tier: 'starter' });
         toast.success('Module updated successfully!');
       } else {
         const { data, error } = await supabase
@@ -292,7 +293,8 @@ const AppsCatalogueTab = () => {
             description: newModule.description,
             is_premium: newModule.isPremium,
             price: newModule.isPremium ? newModule.price : 0,
-            allowed_pages: newModule.allowed_pages ? newModule.allowed_pages.split(',').map(p => p.trim()).filter(Boolean) : []
+            allowed_pages: newModule.allowed_pages ? newModule.allowed_pages.split(',').map(p => p.trim()).filter(Boolean) : [],
+            tier: newModule.tier || 'starter'
           }])
           .select()
           .single();
@@ -301,7 +303,7 @@ const AppsCatalogueTab = () => {
 
         setModules([...modules, data]);
         setIsModuleModalOpen(false);
-        setNewModule({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0, allowed_pages: '' });
+        setNewModule({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0, allowed_pages: '', tier: 'starter' });
         toast.success('Module added successfully!');
       }
     } catch (error) {
@@ -322,7 +324,8 @@ const AppsCatalogueTab = () => {
       description: mod.description,
       isPremium: mod.is_premium,
       price: mod.price || 0,
-      allowed_pages: mod.allowed_pages ? mod.allowed_pages.join(', ') : ''
+      allowed_pages: mod.allowed_pages ? mod.allowed_pages.join(', ') : '',
+      tier: mod.tier || 'starter'
     });
     setIsModuleModalOpen(true);
   };
@@ -556,13 +559,13 @@ const AppsCatalogueTab = () => {
 
              {/* Modules Section Header */}
              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-white">Configured Modules</h3>
-                <button 
-                  onClick={() => {
-                    setIsEditModuleMode(false);
-                    setNewModule({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0, allowed_pages: '' });
-                    setIsModuleModalOpen(true);
-                  }}
+                 <h3 className="text-lg font-semibold text-white">Configured Modules</h3>
+                 <button 
+                   onClick={() => {
+                     setIsEditModuleMode(false);
+                     setNewModule({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0, allowed_pages: '', tier: 'starter' });
+                     setIsModuleModalOpen(true);
+                   }}
                   className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg border border-gray-600 transition-colors text-sm"
                 >
                   <Plus size={16} /> Add Module
@@ -594,7 +597,14 @@ const AppsCatalogueTab = () => {
                            )}
                         </div>
                         <div className="min-w-0 pr-8">
-                           <h4 className="text-white font-semibold truncate">{mod.name}</h4>
+                           <h4 className="text-white font-semibold truncate flex items-center gap-2">
+                              {mod.name}
+                              {mod.tier && (
+                                <span className="text-[10px] bg-violet-500/20 text-violet-400 px-1.5 py-0.5 rounded border border-violet-500/20 font-bold uppercase">
+                                  {mod.tier}
+                                </span>
+                              )}
+                           </h4>
                            <p className="font-mono text-[10px] text-violet-400 bg-violet-900/30 inline-block px-1.5 py-0.5 rounded leading-none">
                               {mod.code}
                            </p>
@@ -785,10 +795,28 @@ const AppsCatalogueTab = () => {
               <textarea value={newModule.description} onChange={e => setNewModule({...newModule, description: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-violet-500 focus:border-violet-500 h-20" placeholder="What does this module do?" />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Pages Autorisées (Tags)</label>
-              <input type="text" value={newModule.allowed_pages} onChange={e => setNewModule({...newModule, allowed_pages: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-violet-500 focus:border-violet-500" placeholder="e.g. classroom, planning, subject (Séparés par des virgules. Laisser vide = toutes les pages)" />
-              <p className="text-xs text-gray-500 mt-1">Si laissé vide, le module donnera accès à toutes ses pages par défaut.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Pages Autorisées (Tags)</label>
+                <input type="text" value={newModule.allowed_pages} onChange={e => setNewModule({...newModule, allowed_pages: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-violet-500 focus:border-violet-500" placeholder="e.g. classroom, planning, subject (Séparés par des virgules. Laisser vide = toutes les pages)" />
+                <p className="text-xs text-gray-500 mt-1">Si laissé vide, le module donnera accès à toutes ses pages par défaut.</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1 font-mono tracking-widest text-[10px] uppercase font-black text-gray-500">Type de Module (Tier)</label>
+                <select 
+                  value={newModule.tier || 'starter'} 
+                  onChange={e => setNewModule({...newModule, tier: e.target.value})} 
+                  className="w-full bg-gray-800 border border-gray-700 rounded-xl p-2.5 text-white focus:ring-violet-500 focus:border-violet-500 text-sm font-bold"
+                >
+                  <option value="starter">Starter</option>
+                  <option value="standard">Standard</option>
+                  <option value="medium">Medium</option>
+                  <option value="normal">Normal</option>
+                  <option value="moyen">Moyen</option>
+                  <option value="premium">Premium</option>
+                  <option value="golden">Golden</option>
+                </select>
+              </div>
             </div>
            
            <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl flex flex-col gap-3 mt-2">
