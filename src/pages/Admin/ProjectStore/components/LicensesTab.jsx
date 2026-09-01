@@ -149,7 +149,8 @@ const LicensesTab = () => {
               if (baseModules.length > 0) {
                 const licenseEntries = baseModules.map(m => ({
                   tenant_id: selectedCustomerId,
-                  module_id: m.id
+                  module_id: m.id,
+                  allowed_pages: m.allowed_pages || []
                 }));
         
                 const { error: licenseError } = await supabase.from('tenant_licenses').insert(licenseEntries);
@@ -198,7 +199,8 @@ const LicensesTab = () => {
           .from('tenant_licenses')
           .insert([{
             tenant_id: selectedCustomerId,
-            module_id: moduleId
+            module_id: moduleId,
+            allowed_pages: moduleObj.allowed_pages || []
           }]);
         if (error) throw error;
       }
