@@ -37,7 +37,8 @@ const AppsCatalogueTab = () => {
     builder: '',
     cloudApiUrl: ''
   });
-  const [newModule, setNewModule] = useState({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0, allowed_pages: '', tier: 'starter' });
+  const [newModule, setNewModule] = useState({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0, allowed_tags: '', allowed_pages: '', tier: 'starter' });
+  const [isSyncingManifest, setIsSyncingManifest] = useState(false);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -252,12 +253,131 @@ const AppsCatalogueTab = () => {
     });
   };
 
+  const handleSyncFromManifest = async () => {
+    if (!selectedApp) {
+      toast.error("Veuillez d'abord sélectionner une application.");
+      return;
+    }
+
+    const apiUrl = selectedApp.cloud_api_url || selectedApp.cloudApiUrl || import.meta.env.VITE_SCHOOL_MANAGE_API_URL;
+    if (!apiUrl) {
+      toast.error("Aucune URL d'API Cloud n'est configurée pour cette application.");
+      return;
+    }
+
+    const apiKey = import.meta.env.VITE_HUB_API_KEY;
+    const normalizedApiUrl = apiUrl.replace(/\/api\/?$/, '').replace(/\/+$/, '');
+    const toastId = toast.loading(`Synchronisation du catalogue depuis ${selectedApp.name}...`);
+    setIsSyncingManifest(true);
+
+    try {
+      const response = await fetch(`${normalizedApiUrl}/api/external/catalog-manifest/`, {
+        method: 'GET',
+        headers: {
+          'X-Hub-Api-Key': apiKey || 'ethernanos-hub-secret-2026'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Erreur HTTP ${response.status}`);
+      }
+
+      const manifest = await response.json();
+      const manifestModules = manifest.modules || [];
+      const freeTags = manifest.free_tags || [];
+
+      let syncCount = 0;
+
+      // 1. Synchronisation des modules de l'application
+      for (const mod of manifestModules) {
+        const existingMod = modules.find(m => m.app_id === selectedApp.id && m.code === mod.code);
+        const tags = mod.tags || [];
+
+        if (existingMod) {
+          const { error } = await supabase
+            .from('app_modules')
+            .update({
+              name: mod.name || existingMod.name,
+              icon: mod.icon || existingMod.icon,
+              allowed_tags: tags,
+              allowed_pages: tags,
+            })
+            .eq('id', existingMod.id);
+          if (!error) syncCount++;
+        } else {
+          const { error } = await supabase
+            .from('app_modules')
+            .insert([{
+              app_id: selectedApp.id,
+              name: mod.name,
+              code: mod.code,
+              icon: mod.icon || '',
+              description: `Module synchronisé depuis le manifeste (${tags.length} tags)`,
+              is_premium: false,
+              price: 0,
+              allowed_tags: tags,
+              allowed_pages: tags,
+              tier: 'starter'
+            }]);
+          if (!error) syncCount++;
+        }
+      }
+
+      // 2. Synchronisation des Free Tags comme Add-ons optionnels
+      for (const ft of freeTags) {
+        const tagCode = `free-${ft.tag}`;
+        const existingTagMod = modules.find(m => m.app_id === selectedApp.id && m.code === tagCode);
+        const tags = [ft.tag];
+
+        if (existingTagMod) {
+          await supabase
+            .from('app_modules')
+            .update({
+              name: ft.name || ft.label || ft.tag,
+              description: ft.description || 'Option transversale monétisable (Add-on)',
+              allowed_tags: tags,
+              allowed_pages: tags,
+            })
+            .eq('id', existingTagMod.id);
+        } else {
+          await supabase
+            .from('app_modules')
+            .insert([{
+              app_id: selectedApp.id,
+              name: ft.name || ft.label || ft.tag,
+              code: tagCode,
+              icon: 'pascal-icon-dashboard',
+              description: ft.description || 'Option transversale monétisable (Add-on)',
+              is_premium: true,
+              price: 50,
+              allowed_tags: tags,
+              allowed_pages: tags,
+              tier: 'addon'
+            }]);
+          syncCount++;
+        }
+      }
+
+      toast.success(`${syncCount} modules & options synchronisés avec succès depuis l'application !`, { id: toastId });
+      await fetchData();
+    } catch (err) {
+      console.error('Error syncing catalog manifest:', err);
+      toast.error(`Échec de la synchronisation : ${err.message}`, { id: toastId });
+    } finally {
+      setIsSyncingManifest(false);
+    }
+  };
+
   const handleCreateModule = async (e) => {
     e.preventDefault();
     if (!selectedApp) return;
     
     setIsSubmitting(true);
     try {
+      const rawTags = newModule.allowed_tags || newModule.allowed_pages || '';
+      const tagsList = rawTags ? rawTags.split(',').map(p => p.trim()).filter(Boolean) : [];
+
       if (isEditModuleMode && newModule.id) {
         const { data, error } = await supabase
           .from('app_modules')
@@ -268,7 +388,8 @@ const AppsCatalogueTab = () => {
             description: newModule.description,
             is_premium: newModule.isPremium,
             price: newModule.isPremium ? newModule.price : 0,
-            allowed_pages: newModule.allowed_pages ? newModule.allowed_pages.split(',').map(p => p.trim()).filter(Boolean) : [],
+            allowed_tags: tagsList,
+            allowed_pages: tagsList,
             tier: newModule.tier || 'starter'
           })
           .eq('id', newModule.id)
@@ -280,7 +401,7 @@ const AppsCatalogueTab = () => {
         setModules(modules.map(m => m.id === data.id ? data : m));
         setIsModuleModalOpen(false);
         setIsEditModuleMode(false);
-        setNewModule({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0, allowed_pages: '', tier: 'starter' });
+        setNewModule({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0, allowed_tags: '', allowed_pages: '', tier: 'starter' });
         toast.success('Module updated successfully!');
       } else {
         const { data, error } = await supabase
@@ -293,7 +414,8 @@ const AppsCatalogueTab = () => {
             description: newModule.description,
             is_premium: newModule.isPremium,
             price: newModule.isPremium ? newModule.price : 0,
-            allowed_pages: newModule.allowed_pages ? newModule.allowed_pages.split(',').map(p => p.trim()).filter(Boolean) : [],
+            allowed_tags: tagsList,
+            allowed_pages: tagsList,
             tier: newModule.tier || 'starter'
           }])
           .select()
@@ -303,7 +425,7 @@ const AppsCatalogueTab = () => {
 
         setModules([...modules, data]);
         setIsModuleModalOpen(false);
-        setNewModule({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0, allowed_pages: '', tier: 'starter' });
+        setNewModule({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0, allowed_tags: '', allowed_pages: '', tier: 'starter' });
         toast.success('Module added successfully!');
       }
     } catch (error) {
@@ -316,6 +438,7 @@ const AppsCatalogueTab = () => {
 
   const handleEditModuleClick = (mod) => {
     setIsEditModuleMode(true);
+    const effectiveTags = mod.allowed_tags || mod.allowed_pages || [];
     setNewModule({
       id: mod.id,
       name: mod.name,
@@ -324,7 +447,8 @@ const AppsCatalogueTab = () => {
       description: mod.description,
       isPremium: mod.is_premium,
       price: mod.price || 0,
-      allowed_pages: mod.allowed_pages ? mod.allowed_pages.join(', ') : '',
+      allowed_tags: Array.isArray(effectiveTags) ? effectiveTags.join(', ') : '',
+      allowed_pages: Array.isArray(effectiveTags) ? effectiveTags.join(', ') : '',
       tier: mod.tier || 'starter'
     });
     setIsModuleModalOpen(true);
@@ -560,16 +684,27 @@ const AppsCatalogueTab = () => {
              {/* Modules Section Header */}
              <div className="flex justify-between items-center mb-4">
                  <h3 className="text-lg font-semibold text-white">Configured Modules</h3>
-                 <button 
-                   onClick={() => {
-                     setIsEditModuleMode(false);
-                     setNewModule({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0, allowed_pages: '', tier: 'starter' });
-                     setIsModuleModalOpen(true);
-                   }}
-                  className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg border border-gray-600 transition-colors text-sm"
-                >
-                  <Plus size={16} /> Add Module
-                </button>
+                 <div className="flex items-center gap-2">
+                   <button 
+                     onClick={handleSyncFromManifest}
+                     disabled={isSyncingManifest}
+                     className="flex items-center gap-2 bg-violet-600/30 hover:bg-violet-600/50 text-violet-200 border border-violet-500/30 px-3.5 py-2 rounded-lg transition-colors text-sm font-medium disabled:opacity-50"
+                     title="Synchroniser la liste des modules et tags directement depuis l'application"
+                   >
+                     <RefreshCw size={15} className={isSyncingManifest ? 'animate-spin' : ''} />
+                     {isSyncingManifest ? 'Synchronisation...' : "Synchroniser depuis l'App"}
+                   </button>
+                   <button 
+                     onClick={() => {
+                       setIsEditModuleMode(false);
+                       setNewModule({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0, allowed_tags: '', allowed_pages: '', tier: 'starter' });
+                       setIsModuleModalOpen(true);
+                     }}
+                     className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg border border-gray-600 transition-colors text-sm"
+                   >
+                     <Plus size={16} /> Add Module
+                   </button>
+                 </div>
              </div>
 
              {/* Modules Grid */}
@@ -614,10 +749,10 @@ const AppsCatalogueTab = () => {
                         {mod.description}
                      </p>
                      
-                     {mod.allowed_pages && mod.allowed_pages.length > 0 && (
+                     {((mod.allowed_tags && mod.allowed_tags.length > 0) || (mod.allowed_pages && mod.allowed_pages.length > 0)) && (
                         <div className="mt-3 flex flex-wrap gap-1">
-                           {mod.allowed_pages.map((page, idx) => (
-                              <span key={idx} className="text-[10px] bg-gray-700 text-gray-300 px-2 py-0.5 rounded-full border border-gray-600">
+                           {(mod.allowed_tags || mod.allowed_pages).map((page, idx) => (
+                              <span key={idx} className="text-[10px] bg-gray-700 text-gray-300 px-2 py-0.5 rounded-full border border-gray-600 font-mono">
                                  {page}
                               </span>
                            ))}
@@ -797,9 +932,9 @@ const AppsCatalogueTab = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Pages Autorisées (Tags)</label>
-                <input type="text" value={newModule.allowed_pages} onChange={e => setNewModule({...newModule, allowed_pages: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-violet-500 focus:border-violet-500" placeholder="e.g. classroom, planning, subject (Séparés par des virgules. Laisser vide = toutes les pages)" />
-                <p className="text-xs text-gray-500 mt-1">Si laissé vide, le module donnera accès à toutes ses pages par défaut.</p>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Tags & Options Autorisés (allowed_tags)</label>
+                <input type="text" value={newModule.allowed_tags || newModule.allowed_pages || ''} onChange={e => setNewModule({...newModule, allowed_tags: e.target.value, allowed_pages: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-violet-500 focus:border-violet-500" placeholder="e.g. classroom, planning, graphix (Séparés par des virgules. Laisser vide = tous les tags de base)" />
+                <p className="text-xs text-gray-500 mt-1">Si laissé vide, le module donnera accès à tous ses tags de page standard par défaut.</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1 font-mono tracking-widest text-[10px] uppercase font-black text-gray-500">Type de Module (Tier)</label>

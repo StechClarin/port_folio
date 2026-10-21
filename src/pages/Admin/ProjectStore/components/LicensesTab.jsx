@@ -116,8 +116,8 @@ const LicensesTab = () => {
             const toastId = toast.loading(`Câblage de l'application ${app.name}...`);
         
             try {
-              const apiUrl = import.meta.env.VITE_SCHOOL_MANAGE_API_URL;
-              if (!apiUrl) throw new Error("L'URL de l'API Cloud (VITE_SCHOOL_MANAGE_API_URL) n'est pas configurée.");
+              const apiUrl = app?.cloud_api_url || import.meta.env.VITE_SCHOOL_MANAGE_API_URL;
+              if (!apiUrl) throw new Error("L'URL de l'API Cloud de l'application n'est pas configurée.");
               
               const apiKey = import.meta.env.VITE_HUB_API_KEY;
               const normalizedApiUrl = apiUrl.replace(/\/api\/?$/, '').replace(/\/+$/, '');
@@ -147,11 +147,15 @@ const LicensesTab = () => {
               }
         
               if (baseModules.length > 0) {
-                const licenseEntries = baseModules.map(m => ({
-                  tenant_id: selectedCustomerId,
-                  module_id: m.id,
-                  allowed_pages: m.allowed_pages || []
-                }));
+                const licenseEntries = baseModules.map(m => {
+                  const effectiveTags = m.allowed_tags || m.allowed_pages || [];
+                  return {
+                    tenant_id: selectedCustomerId,
+                    module_id: m.id,
+                    allowed_tags: effectiveTags,
+                    allowed_pages: effectiveTags
+                  };
+                });
         
                 const { error: licenseError } = await supabase.from('tenant_licenses').insert(licenseEntries);
                 if (licenseError) throw licenseError;
@@ -186,6 +190,8 @@ const LicensesTab = () => {
     const toastId = toast.loading(`${hasAccess ? 'Révocation' : 'Déblocage'} du module ${moduleObj.name}...`);
     
     try {
+      const effectiveTags = moduleObj.allowed_tags || moduleObj.allowed_pages || [];
+
       // 1. Mise à jour de Supabase (Cohérence de l'interface Portfolio)
       if (hasAccess) {
         const { error } = await supabase
@@ -200,13 +206,15 @@ const LicensesTab = () => {
           .insert([{
             tenant_id: selectedCustomerId,
             module_id: moduleId,
-            allowed_pages: moduleObj.allowed_pages || []
+            allowed_tags: effectiveTags,
+            allowed_pages: effectiveTags
           }]);
         if (error) throw error;
       }
 
       // 2. Appel au Bridge Django (Synchronisation BDD Centrale)
-      const apiUrl = import.meta.env.VITE_SCHOOL_MANAGE_API_URL;
+      const targetApp = apps.find(a => a.id === moduleObj.app_id);
+      const apiUrl = targetApp?.cloud_api_url || import.meta.env.VITE_SCHOOL_MANAGE_API_URL;
       const apiKey = import.meta.env.VITE_HUB_API_KEY;
       
       if (apiUrl && apiKey && moduleObj.code) {
@@ -223,7 +231,8 @@ const LicensesTab = () => {
             hub_id: hubId,
             module_code: moduleObj.code,
             is_active: !hasAccess,
-            allowed_pages: moduleObj.allowed_pages || []
+            allowed_tags: effectiveTags,
+            allowed_pages: effectiveTags
           })
         });
 

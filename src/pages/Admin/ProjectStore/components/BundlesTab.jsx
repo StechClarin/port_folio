@@ -73,7 +73,7 @@ const BundlesTab = () => {
       // 4. Fetch Modules (for selection)
       const { data: modulesData, error: modulesError } = await supabase
         .from('app_modules')
-        .select('id, name, app_id, tier, code');
+        .select('id, name, app_id, tier, code, allowed_tags, allowed_pages');
       if (modulesError) throw modulesError;
 
       // Group items by bundleId
@@ -470,7 +470,13 @@ const BundlesTab = () => {
                                       <Check size={12} className="stroke-[3]" />
                                   </div>
                                   <span className={`text-sm font-medium ${isSelected ? 'text-white' : 'text-gray-400 group-hover:text-gray-300'}`}>
-                                    {mod.name} {mod.tier && <span className="text-[10px] bg-gray-900 px-1.5 py-0.5 rounded text-gray-500 uppercase font-mono font-bold ml-2 border border-gray-800">({mod.tier})</span>}
+                                    {mod.name} 
+                                    {mod.tier && <span className="text-[10px] bg-gray-900 px-1.5 py-0.5 rounded text-gray-500 uppercase font-mono font-bold ml-2 border border-gray-800">({mod.tier})</span>}
+                                    {((mod.allowed_tags && mod.allowed_tags.length > 0) || (mod.allowed_pages && mod.allowed_pages.length > 0)) && (
+                                      <span className="text-[9px] bg-violet-950/80 text-violet-300 border border-violet-800/40 px-1.5 py-0.5 rounded font-mono ml-2">
+                                        {(mod.allowed_tags || mod.allowed_pages).join(', ')}
+                                      </span>
+                                    )}
                                   </span>
                                 </div>
                             </div>
