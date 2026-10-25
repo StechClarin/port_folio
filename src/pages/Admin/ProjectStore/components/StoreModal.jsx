@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
 
-const StoreModal = ({ isOpen, onClose, title, children }) => {
+const StoreModal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-2xl' }) => {
   // Prevent body scrolling when modal is open
   useEffect(() => {
     if (isOpen) {
@@ -17,7 +17,7 @@ const StoreModal = ({ isOpen, onClose, title, children }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
@@ -26,7 +26,7 @@ const StoreModal = ({ isOpen, onClose, title, children }) => {
       
       {/* Modal Dialog */}
       <div 
-        className="relative bg-gray-900 border border-gray-700 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+        className={`relative bg-gray-900 border border-gray-700 w-full ${maxWidth} rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200`}
       >
         {/* Header */}
         <div className="flex justify-between items-center p-5 border-b border-gray-800 bg-gray-900/50">

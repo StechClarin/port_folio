@@ -180,7 +180,7 @@ const EthernanosDetail = () => {
                         {/* Icon Overlapping */}
                         <div className="absolute bottom-4 left-5">
                            <div className="w-12 h-12 rounded-xl bg-[#030305] border border-white/10 shadow-xl flex items-center justify-center overflow-hidden p-2 group-hover:-translate-y-1 transition-transform duration-300">
-                             {app.icon_svg ? (
+                             {app.icon_svg && typeof app.icon_svg === 'string' && app.icon_svg.trim().startsWith('<svg') ? (
                                <div dangerouslySetInnerHTML={{ __html: app.icon_svg }} className="w-full h-full flex items-center justify-center [&>svg]:w-full [&>svg]:h-full" />
                              ) : (
                                <LayoutGrid size={20} className="text-violet-400" />

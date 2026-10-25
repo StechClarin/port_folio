@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Package, Plus, Trash2, Edit, Save, RefreshCw, Power, ImageIcon, Loader2, Info, Check, X, Box } from 'lucide-react';
+import { Package, Plus, Trash2, Edit, Save, RefreshCw, Power, ImageIcon, Loader2, Info, Check, X, Box, AppWindow, Sparkles, Tag, Layers } from 'lucide-react';
 import StoreModal from './StoreModal';
 import ConfirmModal from './ConfirmModal';
 import { supabase } from '../../../../lib/supabaseClient';
@@ -40,12 +40,14 @@ const BundlesTab = () => {
   };
   const [formData, setFormData] = useState({ 
     id: null, 
+    appId: '',
     name: '', 
     description: '', 
     bannerUrl: '', 
     price: 0, 
     oldPrice: 0,
-    selectedModuleIds: [] 
+    selectedModuleIds: [],
+    allowedTags: []
   });
 
   const fetchData = useCallback(async () => {
@@ -73,7 +75,7 @@ const BundlesTab = () => {
       // 4. Fetch Modules (for selection)
       const { data: modulesData, error: modulesError } = await supabase
         .from('app_modules')
-        .select('id, name, app_id, tier, code, allowed_tags, allowed_pages');
+        .select('*');
       if (modulesError) throw modulesError;
 
       // Group items by bundleId
@@ -110,19 +112,29 @@ const BundlesTab = () => {
     setIsSubmitting(true);
     try {
       let bundleId = formData.id;
+      const bundlePayload = {
+        name: formData.name,
+        description: formData.description,
+        banner_url: formData.bannerUrl,
+        price: formData.price,
+        old_price: formData.oldPrice || null,
+        app_id: formData.appId || null,
+        allowed_tags: formData.allowedTags || [],
+        allowed_pages: formData.allowedTags || [],
+      };
 
       if (isEditMode && bundleId) {
         // Update Bundle
-        const { error: bundleError } = await supabase
+        let { error: bundleError } = await supabase
           .from('bundles')
-          .update({
-            name: formData.name,
-            description: formData.description,
-            banner_url: formData.bannerUrl,
-            price: formData.price,
-            old_price: formData.oldPrice || null,
-          })
+          .update(bundlePayload)
           .eq('id', bundleId);
+
+        if (bundleError && (bundleError.code === '42703' || bundleError.message?.includes('allowed_tags') || bundleError.message?.includes('app_id'))) {
+          const { allowed_tags, app_id, ...fallbackPayload } = bundlePayload;
+          const res = await supabase.from('bundles').update(fallbackPayload).eq('id', bundleId);
+          bundleError = res.error;
+        }
         if (bundleError) throw bundleError;
 
         // Update items (Delete existing and re-insert)
@@ -133,18 +145,18 @@ const BundlesTab = () => {
         if (deleteError) throw deleteError;
       } else {
         // Create Bundle
-        const { data, error: bundleError } = await supabase
+        let { data, error: bundleError } = await supabase
           .from('bundles')
-          .insert([{
-            name: formData.name,
-            description: formData.description,
-            banner_url: formData.bannerUrl,
-            price: formData.price,
-            old_price: formData.oldPrice || null,
-            is_active: true
-          }])
+          .insert([{ ...bundlePayload, is_active: true }])
           .select()
           .single();
+
+        if (bundleError && (bundleError.code === '42703' || bundleError.message?.includes('allowed_tags') || bundleError.message?.includes('app_id'))) {
+          const { allowed_tags, app_id, ...fallbackPayload } = bundlePayload;
+          const res = await supabase.from('bundles').insert([{ ...fallbackPayload, is_active: true }]).select().single();
+          data = res.data;
+          bundleError = res.error;
+        }
         if (bundleError) throw bundleError;
         bundleId = data.id;
       }
@@ -174,16 +186,34 @@ const BundlesTab = () => {
 
   const handleEditClick = (bundle) => {
     setIsEditMode(true);
+    const itemIds = bundleItems[bundle.id] || [];
+    const relatedMod = modules.find(m => itemIds.includes(m.id));
+    const targetAppId = bundle.app_id || relatedMod?.app_id || (apps.length > 0 ? apps[0].id : '');
+
+    let effectiveTags = bundle.allowed_tags || bundle.allowed_pages || [];
+    if (!effectiveTags || effectiveTags.length === 0) {
+      const collected = [];
+      itemIds.forEach(mId => {
+        const m = modules.find(mod => mod.id === mId);
+        if (m) {
+          collected.push(...(m.allowed_tags || m.allowed_pages || []));
+        }
+      });
+      effectiveTags = Array.from(new Set(collected));
+    }
+
     setFormData({
       id: bundle.id,
+      appId: targetAppId,
       name: bundle.name,
       description: bundle.description || '',
       bannerUrl: bundle.banner_url || '',
       price: bundle.price,
       oldPrice: bundle.old_price || 0,
-      selectedModuleIds: bundleItems[bundle.id] || []
+      selectedModuleIds: itemIds,
+      allowedTags: effectiveTags
     });
-    if (apps.length > 0) setSelectedAppId(apps[0].id);
+    setSelectedAppId(targetAppId);
     setIsModalOpen(true);
   };
 
@@ -232,13 +262,48 @@ const BundlesTab = () => {
     );
   };
 
-  const toggleModuleSelection = (moduleId) => {
+  const toggleTag = (tag, moduleId) => {
     setFormData(prev => {
-      const isSelected = prev.selectedModuleIds.includes(moduleId);
-      const newSelections = isSelected 
-        ? prev.selectedModuleIds.filter(id => id !== moduleId) 
-        : [...prev.selectedModuleIds, moduleId];
-      return { ...prev, selectedModuleIds: newSelections };
+      const isTagSelected = prev.allowedTags.includes(tag);
+      const nextTags = isTagSelected 
+        ? prev.allowedTags.filter(t => t !== tag) 
+        : [...prev.allowedTags, tag];
+
+      const mod = modules.find(m => m.id === moduleId);
+      const modTags = mod ? (mod.allowed_tags || mod.allowed_pages || []) : [];
+      const hasRemainingTags = nextTags.some(t => modTags.includes(t));
+
+      let nextModuleIds = prev.selectedModuleIds;
+      if (hasRemainingTags && !nextModuleIds.includes(moduleId)) {
+        nextModuleIds = [...nextModuleIds, moduleId];
+      } else if (!hasRemainingTags && nextModuleIds.includes(moduleId)) {
+        nextModuleIds = nextModuleIds.filter(id => id !== moduleId);
+      }
+
+      return { ...prev, allowedTags: nextTags, selectedModuleIds: nextModuleIds };
+    });
+  };
+
+  const toggleAllTagsForModule = (mod) => {
+    const modTags = mod.allowed_tags || mod.allowed_pages || [];
+    if (modTags.length === 0) return;
+    const allSelected = modTags.every(t => formData.allowedTags.includes(t));
+
+    setFormData(prev => {
+      let nextTags = [...prev.allowedTags];
+      let nextModuleIds = [...prev.selectedModuleIds];
+
+      if (allSelected) {
+        nextTags = nextTags.filter(t => !modTags.includes(t));
+        nextModuleIds = nextModuleIds.filter(id => id !== mod.id);
+      } else {
+        nextTags = Array.from(new Set([...nextTags, ...modTags]));
+        if (!nextModuleIds.includes(mod.id)) {
+          nextModuleIds.push(mod.id);
+        }
+      }
+
+      return { ...prev, allowedTags: nextTags, selectedModuleIds: nextModuleIds };
     });
   };
 
@@ -274,7 +339,18 @@ const BundlesTab = () => {
           <button 
             onClick={() => {
               setIsEditMode(false);
-              setFormData({ id: null, name: '', description: '', bannerUrl: '', price: 0, oldPrice: 0, selectedModuleIds: [] });
+              const defaultAppId = apps.length > 0 ? apps[0].id : '';
+              setFormData({ 
+                id: null, 
+                appId: defaultAppId,
+                name: '', 
+                description: '', 
+                bannerUrl: '', 
+                price: 0, 
+                oldPrice: 0, 
+                selectedModuleIds: [] 
+              });
+              setSelectedAppId(defaultAppId);
               setIsModalOpen(true);
             }}
             className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gradient-to-r from-yellow-600 to-amber-600 hover:from-yellow-500 hover:to-amber-500 text-black font-bold px-6 py-2.5 rounded-xl shadow-lg shadow-yellow-500/20 transition-all whitespace-nowrap"
@@ -324,7 +400,7 @@ const BundlesTab = () => {
                      </div>
                      <div className="flex -space-x-2">
                         {(bundleItems[bundle.id] || []).slice(0, 3).map((modId, i) => (
-                          <div key={i} title={modules.find(m => m.id === modId) ? `${modules.find(m => m.id === modId).name} (${modules.find(m => m.id === modId).tier || 'starter'})` : ''} className="w-8 h-8 rounded-full bg-gray-900 border-2 border-gray-800 flex items-center justify-center text-xs text-yellow-400 font-bold">
+                          <div key={i} title={modules.find(m => m.id === modId)?.name || ''} className="w-8 h-8 rounded-full bg-gray-900 border-2 border-gray-800 flex items-center justify-center text-xs text-yellow-400 font-bold">
                              {modules.find(m => m.id === modId)?.name?.charAt(0) || '?'}
                           </div>
                         ))}
@@ -352,153 +428,314 @@ const BundlesTab = () => {
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
         title={isEditMode ? "Modifier le Pack" : "Créer un Nouveau Pack"}
+        maxWidth="max-w-3xl"
       >
-        <form onSubmit={handleCreateOrUpdate} className="space-y-4">
-           {/* Section 1: General Info */}
+        <form onSubmit={handleCreateOrUpdate} className="space-y-5">
+           {/* Section 1: Application Cible & Nom du Pack */}
            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Nom du Pack</label>
-                <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-yellow-500 focus:border-yellow-500" placeholder="ex: Pack Éducation Complet" />
+                <label className="block text-sm font-medium text-gray-300 mb-1 flex items-center gap-1.5">
+                   <AppWindow size={15} className="text-yellow-400" /> Application Cible
+                </label>
+                <select 
+                  required 
+                  value={formData.appId || selectedAppId || ''} 
+                  onChange={e => {
+                    const newAppId = e.target.value;
+                    setSelectedAppId(newAppId);
+                    setFormData(prev => ({
+                      ...prev,
+                      appId: newAppId,
+                      selectedModuleIds: []
+                    }));
+                  }} 
+                  className="w-full bg-gray-800 border border-gray-700 rounded-xl p-2.5 text-white font-semibold focus:ring-yellow-500 focus:border-yellow-500"
+                >
+                  {apps.map(app => (
+                    <option key={app.id} value={app.id}>{app.name}</option>
+                  ))}
+                </select>
               </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Banner Image URL</label>
-                <div className="flex flex-col gap-2">
-                  <input type="text" value={formData.bannerUrl} onChange={e => setFormData({...formData, bannerUrl: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-yellow-500 focus:border-yellow-500" placeholder="https://images..." />
+                <label className="block text-sm font-medium text-gray-300 mb-1 flex items-center gap-1.5">
+                   <Package size={15} className="text-yellow-400" /> Nom du Pack
+                </label>
+                <input 
+                  required 
+                  type="text" 
+                  value={formData.name} 
+                  onChange={e => setFormData({...formData, name: e.target.value})} 
+                  className="w-full bg-gray-800 border border-gray-700 rounded-xl p-2.5 text-white focus:ring-yellow-500 focus:border-yellow-500" 
+                  placeholder="ex: Pack Scolarité & Analytics" 
+                />
+              </div>
+           </div>
+
+           {/* Section 2: Banner Image, Description & Tarifs */}
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1 flex items-center gap-1.5">
+                   <ImageIcon size={15} className="text-gray-400" /> Banner Image URL
+                </label>
+                <input 
+                  type="text" 
+                  value={formData.bannerUrl} 
+                  onChange={e => setFormData({...formData, bannerUrl: e.target.value})} 
+                  className="w-full bg-gray-800 border border-gray-700 rounded-xl p-2.5 text-white focus:ring-yellow-500 focus:border-yellow-500" 
+                  placeholder="https://images..." 
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Ancien Prix (€)</label>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    value={formData.oldPrice} 
+                    onChange={e => setFormData({...formData, oldPrice: parseFloat(e.target.value) || 0})} 
+                    className="w-full bg-gray-800 border border-gray-700 rounded-xl p-2.5 text-white focus:ring-yellow-500" 
+                    placeholder="0.00" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1 text-yellow-400 font-bold">Prix Promo (€)</label>
+                  <input 
+                    required 
+                    type="number" 
+                    step="0.01" 
+                    value={formData.price} 
+                    onChange={e => setFormData({...formData, price: parseFloat(e.target.value) || 0})} 
+                    className="w-full bg-gray-800 border border-yellow-500/50 rounded-xl p-2.5 text-white font-bold focus:ring-yellow-500" 
+                    placeholder="0.00" 
+                  />
                 </div>
               </div>
            </div>
 
            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Description</label>
-              <textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white h-20 focus:ring-yellow-500 focus:border-yellow-500" placeholder="Décrivez les avantages de ce pack..." />
+              <label className="block text-sm font-medium text-gray-300 mb-1">Description du Pack</label>
+              <textarea 
+                value={formData.description} 
+                onChange={e => setFormData({...formData, description: e.target.value})} 
+                className="w-full bg-gray-800 border border-gray-700 rounded-xl p-2.5 text-white h-16 focus:ring-yellow-500 focus:border-yellow-500 text-sm" 
+                placeholder="Décrivez les avantages et fonctionnalités de cette offre groupée..." 
+              />
            </div>
 
-           <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Ancien Prix (€)</label>
-                <input type="number" step="0.01" value={formData.oldPrice} onChange={e => setFormData({...formData, oldPrice: parseFloat(e.target.value) || 0})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-yellow-500" placeholder="0.00" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Prix Promo (€)</label>
-                <input required type="number" step="0.01" value={formData.price} onChange={e => setFormData({...formData, price: parseFloat(e.target.value) || 0})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-yellow-500" placeholder="0.00" />
-              </div>
-           </div>
+           {/* --- SÉLECTION DES CONTENUS DU PACK --- */}
+           {/* 1. Modules Métier de l'Application (Regroupés avec leurs tags) */}
+           {(() => {
+              const currentAppId = formData.appId || selectedAppId;
+              const appBusinessModules = modules.filter(m => m.app_id === currentAppId && m.code !== 'mod-free' && !m.code?.startsWith('free-'));
+              const freeTagsMod = modules.find(m => m.app_id === currentAppId && m.code === 'mod-free');
+              const freeTagsList = freeTagsMod ? (freeTagsMod.allowed_tags || freeTagsMod.allowed_pages || []) : [];
 
-           {/* Section 2: App & Module Selection */}
-           <div className="pt-4 border-t border-gray-700 mt-6">
-              <label className="block text-lg font-bold text-white mb-3 flex items-center gap-2">
-                 <Box size={20} className="text-yellow-500" /> 
-                 Modules Inclus ({formData.selectedModuleIds.length})
-              </label>
-              
-              <div className="flex gap-4 h-[300px]">
-                {/* App Siderail */}
-                <div className="w-1/3 overflow-y-auto pr-2 border-r border-gray-700 custom-scrollbar space-y-2">
-                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 px-2">Choisir une Application</p>
-                  {apps.map(app => {
-                    const appModules = modules.filter(m => m.app_id === app.id);
-                    const selectedInApp = appModules.filter(m => formData.selectedModuleIds.includes(m.id)).length;
-                    
-                    return (
-                      <div 
-                        key={app.id}
-                        onClick={() => setSelectedAppId(app.id)}
-                        className={`p-3 rounded-xl cursor-pointer transition-all border ${
-                          selectedAppId === app.id 
-                            ? 'bg-yellow-500/20 border-yellow-500/50 text-white' 
-                            : 'bg-gray-800/40 border-transparent text-gray-400 hover:bg-gray-800 hover:text-gray-300'
-                        }`}
-                      >
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-bold truncate">{app.name}</span>
-                          {selectedInApp > 0 && (
-                            <span className="bg-yellow-500 text-black text-[9px] font-black px-1.5 py-0.5 rounded-full">
-                              {selectedInApp}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+              return (
+                 <>
+                    <div className="pt-4 border-t border-gray-700/60 space-y-4">
+                       <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-2">
+                             <Box size={18} className="text-yellow-400" />
+                             <h4 className="text-sm font-bold text-white uppercase tracking-wider">
+                                Modules Métier de l'Application
+                             </h4>
+                          </div>
+                          <div className="text-xs text-gray-400 font-mono">
+                             {appBusinessModules.filter(m => (m.allowed_tags || m.allowed_pages || []).some(t => (formData.allowedTags || []).includes(t))).length} / {appBusinessModules.length} modules sélectionnés
+                          </div>
+                       </div>
 
-                {/* Modules Main Area */}
-                <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                  {selectedAppId ? (
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center mb-2 px-2">
-                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
-                          Modules de {apps.find(a => a.id === selectedAppId)?.name}
-                        </p>
-                        <button 
-                          type="button"
-                          onClick={() => {
-                            const appMods = modules.filter(m => m.app_id === selectedAppId).map(m => m.id);
-                            const allSelected = appMods.every(id => formData.selectedModuleIds.includes(id));
-                            
-                            setFormData(prev => {
-                              let newList;
-                              if (allSelected) {
-                                newList = prev.selectedModuleIds.filter(id => !appMods.includes(id));
-                              } else {
-                                newList = Array.from(new Set([...prev.selectedModuleIds, ...appMods]));
-                              }
-                              return { ...prev, selectedModuleIds: newList };
-                            });
-                          }}
-                          className="text-[10px] font-bold text-yellow-500 hover:text-yellow-400 uppercase tracking-tight"
-                        >
-                          {modules.filter(m => m.app_id === selectedAppId).every(m => formData.selectedModuleIds.includes(m.id)) ? 'Désélectionner Tout' : 'Tout Sélectionner'}
-                        </button>
-                      </div>
+                       {/* Liste des modules métier avec leurs tags regroupés */}
+                       <div className="space-y-3 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
+                          {appBusinessModules.map(mod => {
+                             const modTags = mod.allowed_tags || mod.allowed_pages || [];
+                             const currentTags = formData.allowedTags || [];
+                             const allModTagsSelected = modTags.length > 0 && modTags.every(t => currentTags.includes(t));
+                             const someModTagsSelected = modTags.some(t => currentTags.includes(t));
 
-                      <div className="grid grid-cols-1 gap-2">
-                        {modules.filter(m => m.app_id === selectedAppId).map(mod => {
-                          const isSelected = formData.selectedModuleIds.includes(mod.id);
-                          return (
-                            <div 
-                                key={mod.id}
-                                onClick={() => toggleModuleSelection(mod.id)}
-                                className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between group ${
-                                  isSelected ? 'bg-yellow-500/10 border-yellow-500/50' : 'bg-gray-800/50 border-gray-700/50 hover:border-gray-600'
-                                }`}
-                            >
-                                <div className="flex items-center gap-3">
-                                  <div className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${
-                                      isSelected ? 'bg-yellow-500 border-yellow-400 text-black' : 'bg-gray-900 border-gray-700 text-transparent'
-                                  }`}>
-                                      <Check size={12} className="stroke-[3]" />
-                                  </div>
-                                  <span className={`text-sm font-medium ${isSelected ? 'text-white' : 'text-gray-400 group-hover:text-gray-300'}`}>
-                                    {mod.name} 
-                                    {mod.tier && <span className="text-[10px] bg-gray-900 px-1.5 py-0.5 rounded text-gray-500 uppercase font-mono font-bold ml-2 border border-gray-800">({mod.tier})</span>}
-                                    {((mod.allowed_tags && mod.allowed_tags.length > 0) || (mod.allowed_pages && mod.allowed_pages.length > 0)) && (
-                                      <span className="text-[9px] bg-violet-950/80 text-violet-300 border border-violet-800/40 px-1.5 py-0.5 rounded font-mono ml-2">
-                                        {(mod.allowed_tags || mod.allowed_pages).join(', ')}
-                                      </span>
-                                    )}
-                                  </span>
+                             return (
+                                <div 
+                                   key={mod.id}
+                                   className={`p-3.5 rounded-xl border transition-all ${
+                                      someModTagsSelected 
+                                         ? 'bg-yellow-500/10 border-yellow-500/40 shadow-sm' 
+                                         : 'bg-gray-800/40 border-gray-700/80 hover:border-gray-600'
+                                   }`}
+                                >
+                                   {/* En-tête du module */}
+                                   <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-gray-700/50">
+                                      <div className="flex items-center gap-2.5">
+                                         <div className="w-7 h-7 rounded-lg bg-gray-900 border border-gray-700 flex items-center justify-center text-yellow-400 text-xs shrink-0">
+                                            <Layers size={14} />
+                                         </div>
+                                          <div>
+                                             <div className="flex items-center gap-2">
+                                                <span className="text-sm font-bold text-white block leading-tight">{mod.name}</span>
+                                                {mod.is_premium ? (
+                                                   <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30 font-semibold">
+                                                      Premium {mod.price > 0 ? `(${mod.price}€)` : ''}
+                                                   </span>
+                                                ) : (
+                                                   <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30 font-semibold">
+                                                      Inclus
+                                                   </span>
+                                                )}
+                                             </div>
+                                             <span className="text-[10px] text-gray-400 font-mono">{mod.code}</span>
+                                          </div>
+                                      </div>
+
+                                      <button
+                                         type="button"
+                                         onClick={() => toggleAllTagsForModule(mod)}
+                                         className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all uppercase tracking-wider ${
+                                            allModTagsSelected
+                                               ? 'bg-yellow-500 text-black border-yellow-400 shadow-sm'
+                                               : 'bg-gray-800 text-gray-300 border-gray-600 hover:border-yellow-400/60 hover:text-yellow-300'
+                                         }`}
+                                      >
+                                         {allModTagsSelected ? 'Tout décocher' : 'Tout cocher'}
+                                      </button>
+                                   </div>
+
+                                   {/* Chips des tags de ce module */}
+                                   <div className="flex flex-wrap gap-1.5 pt-1">
+                                      {modTags.map((tag, idx) => {
+                                         const isTagSelected = currentTags.includes(tag);
+                                         return (
+                                            <button
+                                               type="button"
+                                               key={idx}
+                                               onClick={() => toggleTag(tag, mod.id)}
+                                               className={`px-2.5 py-1 rounded-lg text-xs font-mono font-medium flex items-center gap-1.5 border transition-all cursor-pointer ${
+                                                  isTagSelected
+                                                     ? 'bg-yellow-400 text-black font-bold border-yellow-300 shadow-sm'
+                                                     : 'bg-gray-900/80 text-gray-400 border-gray-700 hover:border-gray-500 hover:text-gray-200'
+                                               }`}
+                                            >
+                                               <div className={`w-3.5 h-3.5 rounded flex items-center justify-center text-[10px] ${
+                                                  isTagSelected ? 'bg-black text-yellow-400' : 'border border-gray-600'
+                                               }`}>
+                                                  {isTagSelected && <Check size={10} className="stroke-[3]" />}
+                                               </div>
+                                               <span>{tag}</span>
+                                            </button>
+                                         );
+                                      })}
+                                      {modTags.length === 0 && (
+                                         <span className="text-xs text-gray-500 italic">Aucun tag de page spécifique défini pour ce module.</span>
+                                      )}
+                                   </div>
                                 </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="h-full flex flex-col items-center justify-center text-gray-600 opacity-50">
-                       <Box size={32} className="mb-2" />
-                       <p className="text-sm">Sélectionnez une application à gauche</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-           </div>
+                             );
+                          })}
 
-           <div className="pt-6 flex justify-end gap-3 border-t border-gray-800 mt-6">
-              <button type="button" disabled={isSubmitting} onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition disabled:opacity-50">Annuler</button>
-              <button disabled={isSubmitting} type="submit" className="px-8 py-2.5 bg-yellow-500 hover:bg-yellow-400 text-black font-black rounded-lg transition flex items-center gap-2 disabled:opacity-50 shadow-lg shadow-yellow-500/20">
+                          {appBusinessModules.length === 0 && (
+                             <div className="bg-gray-900/60 border border-dashed border-gray-700 rounded-lg p-4 text-center text-xs text-gray-400">
+                                Aucun module métier trouvé pour cette application.
+                             </div>
+                          )}
+                       </div>
+                    </div>
+
+                    {/* 2. Options Transversales & Add-ons (Free Tags) */}
+                    <div className="bg-gradient-to-br from-violet-950/40 to-purple-950/20 border border-violet-500/30 rounded-xl p-4 space-y-3">
+                       <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                             <Sparkles size={18} className="text-violet-400 animate-pulse" />
+                             <div>
+                                <h4 className="text-sm font-bold text-violet-200 uppercase tracking-wider">
+                                   Options Libres & Extensions (Free Tags)
+                                </h4>
+                                <p className="text-xs text-violet-300/70">
+                                   Capacités transversales sans page de menu (analytiques, portails web, API...)
+                                </p>
+                             </div>
+                          </div>
+
+                          {freeTagsList.length > 0 && (
+                             <button
+                                type="button"
+                                onClick={() => {
+                                   if (freeTagsMod) toggleAllTagsForModule(freeTagsMod);
+                                }}
+                                className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all uppercase tracking-wider ${
+                                   freeTagsList.every(t => (formData.allowedTags || []).includes(t))
+                                      ? 'bg-violet-500 text-white border-violet-400 shadow-sm'
+                                      : 'bg-violet-950/80 text-violet-300 border-violet-700/60 hover:border-violet-400'
+                                }`}
+                             >
+                                {freeTagsList.every(t => (formData.allowedTags || []).includes(t)) ? 'Tout décocher' : 'Tout cocher'}
+                             </button>
+                          )}
+                       </div>
+
+                       {/* Grille des Free Tags individuels */}
+                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 pt-1">
+                          {freeTagsList.map((tag, idx) => {
+                             const isSelected = (formData.allowedTags || []).includes(tag);
+                             return (
+                                <div 
+                                   key={idx}
+                                   onClick={() => {
+                                      if (freeTagsMod) toggleTag(tag, freeTagsMod.id);
+                                   }}
+                                   className={`p-2.5 rounded-xl border cursor-pointer transition-all flex items-center justify-between gap-2 select-none ${
+                                      isSelected 
+                                         ? 'bg-violet-600/25 border-violet-400 shadow-sm shadow-violet-500/10' 
+                                         : 'bg-gray-900/60 border-violet-900/40 hover:border-violet-600/60'
+                                   }`}
+                                >
+                                   <div className="flex items-center gap-2 min-w-0">
+                                      <div className={`w-4 h-4 rounded flex items-center justify-center border transition-colors shrink-0 ${
+                                         isSelected ? 'bg-violet-500 border-violet-400 text-white' : 'bg-gray-900 border-gray-700 text-transparent'
+                                      }`}>
+                                         <Check size={10} className="stroke-[3]" />
+                                      </div>
+                                      <span className={`text-xs font-mono font-bold truncate ${isSelected ? 'text-violet-100' : 'text-gray-300'}`}>
+                                         {tag}
+                                      </span>
+                                   </div>
+                                   <span className="text-[9px] uppercase font-bold text-violet-400 bg-violet-950 px-1.5 py-0.5 rounded border border-violet-800/40 shrink-0 font-mono">
+                                      free
+                                   </span>
+                                </div>
+                             );
+                          })}
+
+                          {freeTagsList.length === 0 && (
+                             <div className="col-span-full bg-gray-900/60 border border-dashed border-violet-700/40 rounded-lg p-3 text-center text-xs text-gray-400 flex flex-col items-center gap-1">
+                                <Tag size={16} className="text-violet-400" />
+                                <span>Aucun Free Tag synchronisé pour cette application.</span>
+                                <span className="text-violet-400 text-[11px]">
+                                   Astuce : Synchronisez le catalogue depuis l'onglet "Applications" pour importer automatiquement les options libres.
+                                </span>
+                             </div>
+                          )}
+                       </div>
+                    </div>
+                 </>
+              );
+           })()}
+
+           <div className="pt-4 flex justify-end gap-3 border-t border-gray-800 mt-4">
+              <button 
+                type="button" 
+                disabled={isSubmitting} 
+                onClick={() => setIsModalOpen(false)} 
+                className="px-5 py-2.5 bg-gray-800 text-white rounded-xl hover:bg-gray-700 transition disabled:opacity-50 text-sm font-medium"
+              >
+                 Annuler
+              </button>
+              <button 
+                disabled={isSubmitting} 
+                type="submit" 
+                className="px-8 py-2.5 bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-black font-black rounded-xl transition flex items-center gap-2 disabled:opacity-50 shadow-lg shadow-yellow-500/20 text-sm"
+              >
                  {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                 {isSubmitting ? 'Sauvegarde...' : (isEditMode ? 'Enregistrer' : 'Créer le Pack')}
+                 {isSubmitting ? 'Sauvegarde...' : (isEditMode ? 'Enregistrer le Pack' : 'Créer le Pack')}
               </button>
            </div>
         </form>

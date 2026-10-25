@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { AppWindow, Settings, Search, Plus, Trash2, Box, Smartphone, Check, Calendar, ArrowRight, Loader2, RefreshCw, Power, Edit, Package, Shield, MoreVertical, Save, Star, Image as ImageIcon, Copy, Tag } from 'lucide-react';
+import { AppWindow, Settings, Search, Plus, Trash2, Box, Smartphone, Check, Calendar, ArrowRight, Loader2, RefreshCw, Power, Edit, Package, Shield, MoreVertical, Save, Star, Image as ImageIcon, Copy, Tag, Sparkles, DollarSign, Layers } from 'lucide-react';
 import StoreModal from './StoreModal';
 import { supabase } from '../../../../lib/supabaseClient';
 import toast from 'react-hot-toast';
@@ -18,7 +18,12 @@ const AppsCatalogueTab = () => {
   
   // Modal States
   const [isAppModalOpen, setIsAppModalOpen] = useState(false);
-  const [isModuleModalOpen, setIsModuleModalOpen] = useState(false);
+  const [isModuleSettingsModalOpen, setIsModuleSettingsModalOpen] = useState(false);
+  const [selectedModuleForEdit, setSelectedModuleForEdit] = useState(null);
+  const [moduleSettings, setModuleSettings] = useState({
+    is_premium: false,
+    price: 0
+  });
   
   // Menu State
   const [isAppMenuOpen, setIsAppMenuOpen] = useState(false);
@@ -37,7 +42,6 @@ const AppsCatalogueTab = () => {
     builder: '',
     cloudApiUrl: ''
   });
-  const [newModule, setNewModule] = useState({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0, allowed_tags: '', allowed_pages: '', tier: 'starter' });
   const [isSyncingManifest, setIsSyncingManifest] = useState(false);
 
   const fetchData = useCallback(async () => {
@@ -101,6 +105,9 @@ const AppsCatalogueTab = () => {
         setApps(apps.map(a => a.id === data.id ? data : a));
         setSelectedApp(data);
         toast.success('Application updated successfully!');
+        if (data && (data.cloud_api_url || data.cloudApiUrl)) {
+          handleSyncFromManifest(data);
+        }
       } else {
         // Create App
         const { data, error } = await supabase
@@ -126,6 +133,9 @@ const AppsCatalogueTab = () => {
         setApps([data, ...apps]);
         setSelectedApp(data);
         toast.success('Application created successfully!');
+        if (data && (data.cloud_api_url || data.cloudApiUrl)) {
+          handleSyncFromManifest(data);
+        }
       }
 
       setIsAppModalOpen(false);
@@ -253,30 +263,51 @@ const AppsCatalogueTab = () => {
     });
   };
 
-  const handleSyncFromManifest = async () => {
-    if (!selectedApp) {
+  const handleSyncFromManifest = async (targetAppOverride = null) => {
+    const appToSync = targetAppOverride || selectedApp;
+    if (!appToSync) {
       toast.error("Veuillez d'abord sélectionner une application.");
       return;
     }
 
-    const apiUrl = selectedApp.cloud_api_url || selectedApp.cloudApiUrl || import.meta.env.VITE_SCHOOL_MANAGE_API_URL;
+    const apiUrl = appToSync.cloud_api_url || appToSync.cloudApiUrl || import.meta.env.VITE_SCHOOL_MANAGE_API_URL;
     if (!apiUrl) {
       toast.error("Aucune URL d'API Cloud n'est configurée pour cette application.");
       return;
     }
 
     const apiKey = import.meta.env.VITE_HUB_API_KEY;
-    const normalizedApiUrl = apiUrl.replace(/\/api\/?$/, '').replace(/\/+$/, '');
-    const toastId = toast.loading(`Synchronisation du catalogue depuis ${selectedApp.name}...`);
+    let normalizedApiUrl = apiUrl.trim();
+    normalizedApiUrl = normalizedApiUrl.replace(/\/api\/?$/, '');
+    normalizedApiUrl = normalizedApiUrl.replace(/\/schoolmanage(?:\/test)?\/?$/, '');
+    normalizedApiUrl = normalizedApiUrl.replace(/\/admin\/?$/, '');
+    normalizedApiUrl = normalizedApiUrl.replace(/\/+$/, '');
+    const toastId = toast.loading(`Synchronisation du catalogue depuis ${appToSync.name}...`);
     setIsSyncingManifest(true);
 
     try {
-      const response = await fetch(`${normalizedApiUrl}/api/external/catalog-manifest/`, {
-        method: 'GET',
-        headers: {
-          'X-Hub-Api-Key': apiKey || 'ethernanos-hub-secret-2026'
+      let response;
+      const targetUrl = `${normalizedApiUrl}/api/external/catalog-manifest/`;
+      try {
+        response = await fetch(targetUrl, {
+          method: 'GET',
+          headers: {
+            'X-Hub-Api-Key': apiKey || 'ethernanos-hub-secret-2026'
+          }
+        });
+      } catch (directErr) {
+        if (import.meta.env.DEV) {
+          console.warn('[Store] Appel direct bloqué (CORS/réseau), bascule automatique sur le proxy Vite...', directErr);
+          response = await fetch('/vps-proxy/api/external/catalog-manifest/', {
+            method: 'GET',
+            headers: {
+              'X-Hub-Api-Key': apiKey || 'ethernanos-hub-secret-2026'
+            }
+          });
+        } else {
+          throw directErr;
         }
-      });
+      }
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -289,77 +320,95 @@ const AppsCatalogueTab = () => {
 
       let syncCount = 0;
 
-      // 1. Synchronisation des modules de l'application
+      // 1. Synchronisation des modules métier de l'application
       for (const mod of manifestModules) {
-        const existingMod = modules.find(m => m.app_id === selectedApp.id && m.code === mod.code);
+        const existingMod = modules.find(m => m.app_id === appToSync.id && m.code === mod.code);
         const tags = mod.tags || [];
 
+        const updateData = {
+          name: mod.name || existingMod?.name,
+          icon: mod.icon || existingMod?.icon,
+          allowed_tags: tags,
+          allowed_pages: tags,
+        };
+
         if (existingMod) {
-          const { error } = await supabase
+          let { error } = await supabase
             .from('app_modules')
-            .update({
-              name: mod.name || existingMod.name,
-              icon: mod.icon || existingMod.icon,
-              allowed_tags: tags,
-              allowed_pages: tags,
-            })
+            .update(updateData)
             .eq('id', existingMod.id);
+          if (error && (error.code === '42703' || error.message?.includes('allowed_tags'))) {
+            const { allowed_tags, ...fallbackData } = updateData;
+            const res = await supabase.from('app_modules').update(fallbackData).eq('id', existingMod.id);
+            error = res.error;
+          }
           if (!error) syncCount++;
         } else {
-          const { error } = await supabase
-            .from('app_modules')
-            .insert([{
-              app_id: selectedApp.id,
-              name: mod.name,
-              code: mod.code,
-              icon: mod.icon || '',
-              description: `Module synchronisé depuis le manifeste (${tags.length} tags)`,
-              is_premium: false,
-              price: 0,
-              allowed_tags: tags,
-              allowed_pages: tags,
-              tier: 'starter'
-            }]);
+          const insertData = {
+            app_id: appToSync.id,
+            name: mod.name,
+            code: mod.code,
+            icon: mod.icon || '',
+            description: `Module synchronisé depuis le manifeste (${tags.length} tags)`,
+            is_premium: false,
+            price: 0,
+            allowed_tags: tags,
+            allowed_pages: tags
+          };
+          let { error } = await supabase.from('app_modules').insert([insertData]);
+          if (error && (error.code === '42703' || error.message?.includes('allowed_tags'))) {
+            const { allowed_tags, ...fallbackData } = insertData;
+            const res = await supabase.from('app_modules').insert([fallbackData]);
+            error = res.error;
+          }
           if (!error) syncCount++;
         }
       }
 
-      // 2. Synchronisation des Free Tags comme Add-ons optionnels
-      for (const ft of freeTags) {
-        const tagCode = `free-${ft.tag}`;
-        const existingTagMod = modules.find(m => m.app_id === selectedApp.id && m.code === tagCode);
-        const tags = [ft.tag];
+      // 2. Synchronisation du module unique "FreeTags" (mod-free)
+      if (freeTags && freeTags.length > 0) {
+        const freeTagKeys = freeTags.map(ft => (typeof ft === 'string' ? ft : ft.tag)).filter(Boolean);
+        const existingFreeMod = modules.find(m => m.app_id === appToSync.id && m.code === 'mod-free');
+        
+        const freeModData = {
+          app_id: appToSync.id,
+          name: 'FreeTags',
+          code: 'mod-free',
+          icon: 'pascal-icon-dashboard',
+          description: `Options transversales et capacités système (${freeTagKeys.length} tags libres)`,
+          is_premium: false,
+          price: 0,
+          allowed_tags: freeTagKeys,
+          allowed_pages: freeTagKeys,
+        };
 
-        if (existingTagMod) {
-          await supabase
+        if (existingFreeMod) {
+          let { error } = await supabase
             .from('app_modules')
             .update({
-              name: ft.name || ft.label || ft.tag,
-              description: ft.description || 'Option transversale monétisable (Add-on)',
-              allowed_tags: tags,
-              allowed_pages: tags,
+              name: freeModData.name,
+              description: freeModData.description,
+              allowed_tags: freeModData.allowed_tags,
+              allowed_pages: freeModData.allowed_pages,
             })
-            .eq('id', existingTagMod.id);
+            .eq('id', existingFreeMod.id);
+          if (error && (error.code === '42703' || error.message?.includes('allowed_tags'))) {
+            const { allowed_tags, ...fallback } = freeModData;
+            await supabase.from('app_modules').update(fallback).eq('id', existingFreeMod.id);
+          }
         } else {
-          await supabase
-            .from('app_modules')
-            .insert([{
-              app_id: selectedApp.id,
-              name: ft.name || ft.label || ft.tag,
-              code: tagCode,
-              icon: 'pascal-icon-dashboard',
-              description: ft.description || 'Option transversale monétisable (Add-on)',
-              is_premium: true,
-              price: 50,
-              allowed_tags: tags,
-              allowed_pages: tags,
-              tier: 'addon'
-            }]);
-          syncCount++;
+          let { error } = await supabase.from('app_modules').insert([freeModData]);
+          if (error && (error.code === '42703' || error.message?.includes('allowed_tags'))) {
+            const { allowed_tags, ...fallback } = freeModData;
+            await supabase.from('app_modules').insert([fallback]);
+          }
         }
+        // Nettoyer les anciens enregistrements séparés free-* s'ils existent
+        await supabase.from('app_modules').delete().eq('app_id', appToSync.id).like('code', 'free-%');
+        syncCount++;
       }
 
-      toast.success(`${syncCount} modules & options synchronisés avec succès depuis l'application !`, { id: toastId });
+      toast.success(`${syncCount} modules & FreeTags synchronisés avec succès depuis l'application !`, { id: toastId });
       await fetchData();
     } catch (err) {
       console.error('Error syncing catalog manifest:', err);
@@ -369,89 +418,49 @@ const AppsCatalogueTab = () => {
     }
   };
 
-  const handleCreateModule = async (e) => {
+
+
+  const handleOpenModuleSettings = (mod) => {
+    setSelectedModuleForEdit(mod);
+    setModuleSettings({
+      is_premium: Boolean(mod.is_premium),
+      price: mod.price || 0
+    });
+    setIsModuleSettingsModalOpen(true);
+  };
+
+  const handleSaveModuleSettings = async (e) => {
     e.preventDefault();
-    if (!selectedApp) return;
-    
+    if (!selectedModuleForEdit) return;
     setIsSubmitting(true);
+    const toastId = toast.loading('Mise à jour des paramètres du module...');
+
     try {
-      const rawTags = newModule.allowed_tags || newModule.allowed_pages || '';
-      const tagsList = rawTags ? rawTags.split(',').map(p => p.trim()).filter(Boolean) : [];
+      const isPremium = Boolean(moduleSettings.is_premium);
+      const price = isPremium ? Math.max(0, parseFloat(moduleSettings.price) || 0) : 0;
 
-      if (isEditModuleMode && newModule.id) {
-        const { data, error } = await supabase
-          .from('app_modules')
-          .update({
-            name: newModule.name,
-            code: newModule.code,
-            icon: newModule.icon,
-            description: newModule.description,
-            is_premium: newModule.isPremium,
-            price: newModule.isPremium ? newModule.price : 0,
-            allowed_tags: tagsList,
-            allowed_pages: tagsList,
-            tier: newModule.tier || 'starter'
-          })
-          .eq('id', newModule.id)
-          .select()
-          .single();
+      const { data, error } = await supabase
+        .from('app_modules')
+        .update({
+          is_premium: isPremium,
+          price: price
+        })
+        .eq('id', selectedModuleForEdit.id)
+        .select()
+        .single();
 
-        if (error) throw error;
+      if (error) throw error;
 
-        setModules(modules.map(m => m.id === data.id ? data : m));
-        setIsModuleModalOpen(false);
-        setIsEditModuleMode(false);
-        setNewModule({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0, allowed_tags: '', allowed_pages: '', tier: 'starter' });
-        toast.success('Module updated successfully!');
-      } else {
-        const { data, error } = await supabase
-          .from('app_modules')
-          .insert([{
-            app_id: selectedApp.id,
-            name: newModule.name,
-            code: newModule.code,
-            icon: newModule.icon,
-            description: newModule.description,
-            is_premium: newModule.isPremium,
-            price: newModule.isPremium ? newModule.price : 0,
-            allowed_tags: tagsList,
-            allowed_pages: tagsList,
-            tier: newModule.tier || 'starter'
-          }])
-          .select()
-          .single();
-
-        if (error) throw error;
-
-        setModules([...modules, data]);
-        setIsModuleModalOpen(false);
-        setNewModule({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0, allowed_tags: '', allowed_pages: '', tier: 'starter' });
-        toast.success('Module added successfully!');
-      }
-    } catch (error) {
-      console.error('Error creating/updating module:', error);
-      toast.error(error.message || 'Failed to save module');
+      setModules(prev => prev.map(m => m.id === selectedModuleForEdit.id ? { ...m, is_premium: isPremium, price: price } : m));
+      toast.success(`Module "${selectedModuleForEdit.name}" configuré avec succès !`, { id: toastId });
+      setIsModuleSettingsModalOpen(false);
+      setSelectedModuleForEdit(null);
+    } catch (err) {
+      console.error('Error saving module settings:', err);
+      toast.error(`Erreur : ${err.message || 'Impossible de sauvegarder le module'}`, { id: toastId });
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleEditModuleClick = (mod) => {
-    setIsEditModuleMode(true);
-    const effectiveTags = mod.allowed_tags || mod.allowed_pages || [];
-    setNewModule({
-      id: mod.id,
-      name: mod.name,
-      code: mod.code,
-      icon: mod.icon || '',
-      description: mod.description,
-      isPremium: mod.is_premium,
-      price: mod.price || 0,
-      allowed_tags: Array.isArray(effectiveTags) ? effectiveTags.join(', ') : '',
-      allowed_pages: Array.isArray(effectiveTags) ? effectiveTags.join(', ') : '',
-      tier: mod.tier || 'starter'
-    });
-    setIsModuleModalOpen(true);
   };
 
   const handleDeleteModule = async (moduleId, moduleName) => {
@@ -545,10 +554,10 @@ const AppsCatalogueTab = () => {
               <div className="flex items-center gap-4">
                  <div className={`w-12 h-12 rounded-lg flex items-center justify-center text-xl font-bold relative
                     ${selectedApp?.id === app.id ? 'bg-violet-600 text-white' : 'bg-gray-700 text-gray-300'}`}>
-                    {app.icon_svg ? (
+                    {app.icon_svg && typeof app.icon_svg === 'string' && app.icon_svg.trim().startsWith('<svg') ? (
                        <div dangerouslySetInnerHTML={{ __html: app.icon_svg }} className="w-8 h-8 flex items-center justify-center [&>svg]:w-full [&>svg]:h-full [&>svg]:max-w-full [&>svg]:max-h-full" />
                     ) : (
-                       app.name.charAt(0)
+                       app.name?.charAt(0) || 'A'
                     )}
                     {(app.is_featured || app.is_offer_of_the_year) && (
                       <div className="absolute -top-1 -right-1 bg-amber-500 text-white rounded-full p-0.5 shadow-lg">
@@ -682,89 +691,162 @@ const AppsCatalogueTab = () => {
             </div>
 
              {/* Modules Section Header */}
-             <div className="flex justify-between items-center mb-4">
-                 <h3 className="text-lg font-semibold text-white">Configured Modules</h3>
+             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-4">
+                 <div>
+                   <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                     <Layers size={20} className="text-violet-400" />
+                     Modules & Capacités Synchronisés
+                   </h3>
+                   <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                     <span className="flex items-center gap-1.5">
+                       <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                       <strong className="text-emerald-400">{appModules.filter(m => !m.is_premium).length}</strong> inclus de base
+                     </span>
+                     <span>•</span>
+                     <span className="flex items-center gap-1.5">
+                       <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                       <strong className="text-amber-400">{appModules.filter(m => m.is_premium).length}</strong> options premium
+                     </span>
+                   </div>
+                 </div>
                  <div className="flex items-center gap-2">
                    <button 
-                     onClick={handleSyncFromManifest}
+                     onClick={() => handleSyncFromManifest()}
                      disabled={isSyncingManifest}
-                     className="flex items-center gap-2 bg-violet-600/30 hover:bg-violet-600/50 text-violet-200 border border-violet-500/30 px-3.5 py-2 rounded-lg transition-colors text-sm font-medium disabled:opacity-50"
+                     className="flex items-center gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white px-4 py-2 rounded-xl border border-violet-500/30 transition-all text-sm font-semibold shadow-lg shadow-violet-500/20 disabled:opacity-50 cursor-pointer"
                      title="Synchroniser la liste des modules et tags directement depuis l'application"
                    >
                      <RefreshCw size={15} className={isSyncingManifest ? 'animate-spin' : ''} />
                      {isSyncingManifest ? 'Synchronisation...' : "Synchroniser depuis l'App"}
-                   </button>
-                   <button 
-                     onClick={() => {
-                       setIsEditModuleMode(false);
-                       setNewModule({ id: null, name: '', code: '', icon: '', description: '', isPremium: false, price: 0, allowed_tags: '', allowed_pages: '', tier: 'starter' });
-                       setIsModuleModalOpen(true);
-                     }}
-                     className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg border border-gray-600 transition-colors text-sm"
-                   >
-                     <Plus size={16} /> Add Module
                    </button>
                  </div>
              </div>
 
              {/* Modules Grid */}
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 auto-rows-max overflow-y-auto pb-4 custom-scrollbar">
-                {appModules.map((mod) => (
-                   <div
-                     key={mod.id}
-                     className="bg-gray-800/80 border border-gray-700 p-5 rounded-xl hover:border-gray-500 transition-colors group relative overflow-hidden"
-                   >
-                     {/* Premium Ribbon */}
-                     {mod.is_premium && (
-                        <div className="absolute top-0 right-0 overflow-hidden w-24 h-24 pointer-events-none">
-                           <div className="absolute transform rotate-45 bg-gradient-to-r from-amber-400 to-orange-500 text-amber-950 text-[10px] font-bold py-1 right-[-35px] top-[15px] w-[130px] text-center shadow-lg uppercase tracking-wider">
-                              Premium
-                           </div>
-                        </div>
-                     )}
+                {appModules.map((mod) => {
+                   const isPremium = Boolean(mod.is_premium);
+                   const tags = mod.allowed_tags || mod.allowed_pages || [];
 
-                      <div className="flex items-center gap-4 mb-3">
-                        <div className="w-10 h-10 rounded-lg bg-gray-900 border border-gray-700 flex items-center justify-center text-xl shrink-0">
-                           {mod.icon ? (
-                              <div dangerouslySetInnerHTML={{ __html: mod.icon }} className="w-6 h-6" />
-                           ) : (
-                              <Box size={20} className="text-gray-600" />
-                           )}
-                        </div>
-                        <div className="min-w-0 pr-8">
-                           <h4 className="text-white font-semibold truncate flex items-center gap-2">
-                              {mod.name}
-                              {mod.tier && (
-                                <span className="text-[10px] bg-violet-500/20 text-violet-400 px-1.5 py-0.5 rounded border border-violet-500/20 font-bold uppercase">
-                                  {mod.tier}
-                                </span>
-                              )}
-                           </h4>
-                           <p className="font-mono text-[10px] text-violet-400 bg-violet-900/30 inline-block px-1.5 py-0.5 rounded leading-none">
-                              {mod.code}
-                           </p>
-                        </div>
-                      </div>
-                     <p className="text-sm text-gray-400 line-clamp-2">
-                        {mod.description}
-                     </p>
-                     
-                     {((mod.allowed_tags && mod.allowed_tags.length > 0) || (mod.allowed_pages && mod.allowed_pages.length > 0)) && (
-                        <div className="mt-3 flex flex-wrap gap-1">
-                           {(mod.allowed_tags || mod.allowed_pages).map((page, idx) => (
-                              <span key={idx} className="text-[10px] bg-gray-700 text-gray-300 px-2 py-0.5 rounded-full border border-gray-600 font-mono">
-                                 {page}
-                              </span>
-                           ))}
-                        </div>
-                     )}
-                     
-                     <div className="mt-4 pt-4 border-t border-gray-700 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => handleDeleteModule(mod.id, mod.name)} className="text-sm text-red-500 hover:text-red-400 transition-colors flex items-center gap-1"><Trash2 size={14}/> Delete</button>
-                        <button onClick={() => handleEditModuleClick(mod)} className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-1"><Edit size={14}/> Edit</button>
+                   return (
+                     <div
+                       key={mod.id}
+                       className={`p-5 rounded-2xl border transition-all duration-200 group relative flex flex-col justify-between ${
+                         isPremium 
+                           ? 'bg-gradient-to-br from-gray-800/90 via-gray-800/80 to-amber-950/20 border-amber-500/30 hover:border-amber-500/50 shadow-sm' 
+                           : 'bg-gradient-to-br from-gray-800/90 via-gray-800/80 to-emerald-950/20 border-emerald-500/20 hover:border-emerald-500/40'
+                       }`}
+                     >
+                       {/* Header: Icon, Name, Code & Badge Inclus vs Premium */}
+                       <div>
+                         <div className="flex items-start justify-between gap-3 mb-3">
+                           <div className="flex items-center gap-3 min-w-0">
+                             <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0 border ${
+                               mod.code === 'mod-free'
+                                 ? 'bg-purple-500/10 border-purple-500/30 text-purple-400'
+                                 : isPremium 
+                                   ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' 
+                                   : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                             }`}>
+                               {mod.code === 'mod-free' ? (
+                                 <Sparkles size={22} className="text-purple-400" />
+                               ) : mod.icon && typeof mod.icon === 'string' && mod.icon.trim().startsWith('<svg') ? (
+                                 <div dangerouslySetInnerHTML={{ __html: mod.icon }} className="w-6 h-6 flex items-center justify-center [&>svg]:w-full [&>svg]:h-full" />
+                               ) : (
+                                 <Box size={22} className={isPremium ? 'text-amber-400' : 'text-emerald-400'} />
+                               )}
+                             </div>
+                             <div className="min-w-0">
+                               <h4 className="text-white font-bold truncate text-base leading-tight">
+                                 {mod.name}
+                               </h4>
+                               <div className="flex items-center gap-2 mt-1">
+                                 <span className="font-mono text-[10px] text-violet-300 bg-violet-900/40 border border-violet-700/40 px-1.5 py-0.5 rounded leading-none">
+                                   {mod.code}
+                                 </span>
+                                 {mod.code === 'mod-free' && (
+                                   <span className="text-[10px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded border border-purple-500/30 font-medium">
+                                     FreeTags
+                                   </span>
+                                 )}
+                               </div>
+                             </div>
+                           </div>
+
+                           {/* Status Badge: Inclus vs Premium */}
+                           <div className="shrink-0 flex flex-col items-end">
+                             {isPremium ? (
+                               <>
+                                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 shadow-sm">
+                                   <Sparkles size={11} className="text-amber-400" />
+                                   Option Premium
+                                 </span>
+                                 <span className="text-xs font-mono font-bold text-amber-300 mt-1">
+                                   {mod.price > 0 ? `+${mod.price} €/an` : 'Prix non fixé'}
+                                 </span>
+                               </>
+                             ) : (
+                               <>
+                                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                   <Check size={11} className="text-emerald-400 stroke-[3]" />
+                                   Inclus de base
+                                 </span>
+                                 <span className="text-[10px] text-emerald-500/80 font-mono mt-1">
+                                   Offert avec la licence
+                                 </span>
+                               </>
+                             )}
+                           </div>
+                         </div>
+
+                         <p className="text-xs text-gray-400 line-clamp-2 mt-2">
+                           {mod.description || 'Module synchronisé depuis le catalogue applicatif.'}
+                         </p>
+
+                         {/* Tags Pills */}
+                         {tags.length > 0 && (
+                           <div className="mt-3.5 pt-3 border-t border-gray-700/40">
+                             <div className="flex items-center justify-between text-[11px] text-gray-400 mb-1.5 font-medium">
+                               <span>Tags de navigation associés :</span>
+                               <span className="font-mono bg-gray-900 px-1.5 py-0.5 rounded text-gray-300 border border-gray-700">{tags.length}</span>
+                             </div>
+                             <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto custom-scrollbar">
+                               {tags.map((tag, idx) => (
+                                 <span key={idx} className="text-[10px] bg-gray-900/80 text-gray-300 px-2 py-0.5 rounded-md border border-gray-700 font-mono">
+                                   {tag}
+                                 </span>
+                               ))}
+                             </div>
+                           </div>
+                         )}
+                       </div>
+
+                       {/* Card Bottom Actions: Paramètres + Supprimer */}
+                       <div className="mt-4 pt-3 border-t border-gray-700/60 flex items-center justify-between">
+                         <span className={`text-[11px] font-mono font-medium ${isPremium ? 'text-amber-400/80' : 'text-emerald-400/80'}`}>
+                           {isPremium ? '⚡ Option payante' : '✓ Licence standard'}
+                         </span>
+                         <div className="flex items-center gap-2">
+                           <button
+                             onClick={() => handleOpenModuleSettings(mod)}
+                             className="px-2.5 py-1.5 text-xs rounded-lg bg-gray-700/80 hover:bg-violet-600 text-gray-200 hover:text-white border border-gray-600 hover:border-violet-500/60 transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                             title="Configurer ce module (Inclus / Premium & Prix)"
+                           >
+                             <Settings size={13} className="text-violet-300" />
+                             <span>Paramètres</span>
+                           </button>
+                           <button
+                             onClick={() => handleDeleteModule(mod.id, mod.name)}
+                             className="p-1.5 text-xs rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                             title="Supprimer ce module"
+                           >
+                             <Trash2 size={13} />
+                           </button>
+                         </div>
+                       </div>
                      </div>
-                   </div>
-                ))}
+                   );
+                })}
              </div>
           </>
         ) : (
@@ -802,7 +884,7 @@ const AppsCatalogueTab = () => {
                </div>
                <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">Cloud API URL (Serveur Maître)</label>
-                  <input type="url" value={newApp.cloudApiUrl} onChange={e => setNewApp({...newApp, cloudApiUrl: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-violet-500 focus:border-violet-500 font-mono text-sm" placeholder="http://72.60.2.96:8080/schoolmanage/" />
+                  <input type="url" value={newApp.cloudApiUrl} onChange={e => setNewApp({...newApp, cloudApiUrl: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-violet-500 focus:border-violet-500 font-mono text-sm" placeholder="http://72.60.2.96:8080 ou https://eteyelo.online" />
                </div>
             </div>
            <div>
@@ -881,109 +963,130 @@ const AppsCatalogueTab = () => {
         </form>
       </StoreModal>
 
-      {/* Create Module Modal */}
-      <StoreModal 
-        isOpen={isModuleModalOpen} 
-        onClose={() => setIsModuleModalOpen(false)} 
-        title={isEditModuleMode ? "Edit Module" : `Add Module to ${selectedApp?.name}`}
+      {/* Module Settings Modal (Inclus vs Premium + Prix) */}
+      <StoreModal
+        isOpen={isModuleSettingsModalOpen}
+        onClose={() => setIsModuleSettingsModalOpen(false)}
+        title={`Paramètres du Module : ${selectedModuleForEdit?.name || ''}`}
+        maxWidth="max-w-xl"
       >
-        <form className="space-y-4" onSubmit={handleCreateModule}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {selectedModuleForEdit && (
+          <form onSubmit={handleSaveModuleSettings} className="space-y-5">
+            {/* Context Box */}
+            <div className="p-3.5 bg-gray-800/80 rounded-xl border border-gray-700 flex items-center justify-between">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Module Name (Display)</label>
-                <input type="text" value={newModule.name} onChange={e => setNewModule({...newModule, name: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-violet-500 focus:border-violet-500" placeholder="e.g. Advanced Finance" />
+                <span className="text-xs text-gray-400 block font-medium">Code Technique</span>
+                <span className="text-sm font-mono text-violet-400 font-bold">{selectedModuleForEdit.code}</span>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Module Code (Technical)</label>
-                <input type="text" value={newModule.code} onChange={e => setNewModule({...newModule, code: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white font-mono text-sm focus:ring-violet-500 focus:border-violet-500" placeholder="e.g. finance_adv" />
+              <div className="text-right">
+                <span className="text-xs text-gray-400 block font-medium">Tags autorisés</span>
+                <span className="text-sm font-mono text-gray-200">
+                  {(selectedModuleForEdit.allowed_tags || selectedModuleForEdit.allowed_pages || []).length} tags
+                </span>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-               <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Module Logo (SVG Code / Emoji)</label>
-                  <textarea 
-                    value={newModule.icon} 
-                    onChange={e => setNewModule({...newModule, icon: e.target.value})} 
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white font-mono text-xs focus:ring-violet-500 focus:border-violet-500 h-20" 
-                    placeholder='<svg>...</svg> or 👨‍💻' 
-                  />
-               </div>
-               <div className="flex flex-col">
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Preview</label>
-                  <div className="flex-1 bg-gray-900 border border-gray-700 rounded-lg flex items-center justify-center text-2xl">
-                    {newModule.icon ? (
-                       newModule.icon.includes('<svg') ? (
-                          <div dangerouslySetInnerHTML={{ __html: newModule.icon }} className="w-8 h-8" />
-                       ) : (
-                          newModule.icon
-                       )
-                    ) : (
-                       <Box size={24} className="text-gray-700" />
-                    )}
-                  </div>
-               </div>
-            </div>
-
+            {/* Type de Module : Inclus vs Premium */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Description</label>
-              <textarea value={newModule.description} onChange={e => setNewModule({...newModule, description: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-violet-500 focus:border-violet-500 h-20" placeholder="What does this module do?" />
+              <label className="block text-sm font-semibold text-gray-200 mb-2">
+                Type de distribution du module
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Option 1: Inclus de base */}
+                <div
+                  onClick={() => setModuleSettings(prev => ({ ...prev, is_premium: false }))}
+                  className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                    !moduleSettings.is_premium
+                      ? 'bg-emerald-500/15 border-emerald-500 text-white shadow-lg shadow-emerald-500/10'
+                      : 'bg-gray-800/50 border-gray-700 text-gray-400 hover:border-gray-600'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                      !moduleSettings.is_premium ? 'border-emerald-400 bg-emerald-500 text-black' : 'border-gray-600'
+                    }`}>
+                      {!moduleSettings.is_premium && <Check size={10} className="stroke-[3]" />}
+                    </div>
+                    <span className="text-sm font-bold text-white">Inclus de base</span>
+                  </div>
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    Fourni automatiquement avec la licence standard de l'application sans surcoût.
+                  </p>
+                </div>
+
+                {/* Option 2: Option Premium */}
+                <div
+                  onClick={() => setModuleSettings(prev => ({ ...prev, is_premium: true }))}
+                  className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                    moduleSettings.is_premium
+                      ? 'bg-amber-500/15 border-amber-500 text-white shadow-lg shadow-amber-500/10'
+                      : 'bg-gray-800/50 border-gray-700 text-gray-400 hover:border-gray-600'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                      moduleSettings.is_premium ? 'border-amber-400 bg-amber-500 text-black' : 'border-gray-600'
+                    }`}>
+                      {moduleSettings.is_premium && <Check size={10} className="stroke-[3]" />}
+                    </div>
+                    <span className="text-sm font-bold text-white flex items-center gap-1.5">
+                      <Sparkles size={14} className="text-amber-400" />
+                      Option Premium
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    Module optionnel payant. Non inclus dans l'offre standard.
+                  </p>
+                </div>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Tags & Options Autorisés (allowed_tags)</label>
-                <input type="text" value={newModule.allowed_tags || newModule.allowed_pages || ''} onChange={e => setNewModule({...newModule, allowed_tags: e.target.value, allowed_pages: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-violet-500 focus:border-violet-500" placeholder="e.g. classroom, planning, graphix (Séparés par des virgules. Laisser vide = tous les tags de base)" />
-                <p className="text-xs text-gray-500 mt-1">Si laissé vide, le module donnera accès à tous ses tags de page standard par défaut.</p>
+            {/* Prix du Module (si Premium) */}
+            {moduleSettings.is_premium && (
+              <div className="p-4 bg-amber-500/5 rounded-xl border border-amber-500/20 animate-in fade-in-50 duration-200">
+                <label className="block text-sm font-semibold text-amber-300 mb-1.5 flex items-center gap-1.5">
+                  <DollarSign size={15} />
+                  Prix additionnel du module (€ / an)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  required
+                  value={moduleSettings.price}
+                  onChange={e => setModuleSettings({ ...moduleSettings, price: e.target.value })}
+                  className="w-full bg-gray-800 border border-amber-500/50 rounded-lg p-2.5 text-white font-mono text-base font-bold focus:ring-amber-500 focus:border-amber-500"
+                  placeholder="ex: 49.00"
+                />
+                <p className="text-xs text-gray-400 mt-1.5">
+                  Ce tarif sera appliqué pour l'activation individuelle de ce module ou pris en compte dans les offres.
+                </p>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1 font-mono tracking-widest text-[10px] uppercase font-black text-gray-500">Type de Module (Tier)</label>
-                <select 
-                  value={newModule.tier || 'starter'} 
-                  onChange={e => setNewModule({...newModule, tier: e.target.value})} 
-                  className="w-full bg-gray-800 border border-gray-700 rounded-xl p-2.5 text-white focus:ring-violet-500 focus:border-violet-500 text-sm font-bold"
-                >
-                  <option value="starter">Starter</option>
-                  <option value="standard">Standard</option>
-                  <option value="medium">Medium</option>
-                  <option value="normal">Normal</option>
-                  <option value="moyen">Moyen</option>
-                  <option value="premium">Premium</option>
-                  <option value="golden">Golden</option>
-                </select>
-              </div>
-            </div>
-           
-           <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl flex flex-col gap-3 mt-2">
-              <div className="flex items-start gap-3">
-                <input type="checkbox" id="isPremium" checked={newModule.isPremium} onChange={e => setNewModule({...newModule, isPremium: e.target.checked})} className="mt-1 w-4 h-4 rounded border-gray-600 text-amber-500 focus:ring-amber-500 bg-gray-800" />
-                <div>
-                   <label htmlFor="isPremium" className="text-amber-500 font-semibold cursor-pointer block">Premium Module (Paid)</label>
-                   <p className="text-xs text-gray-400 mt-1">If active, this module requires a specific license granted to the tenant to be unlocked.</p>
-                </div>
-              </div>
-              
-              {newModule.isPremium && (
-                <div className="mt-2 pl-7 animate-in fade-in duration-300">
-                  <label className="block text-sm font-medium text-amber-500 mb-1">Module Price ($) / Year</label>
-                  <input type="number" min="0" step="0.01" value={newModule.price} onChange={e => setNewModule({...newModule, price: parseFloat(e.target.value) || 0})} className="w-full sm:w-1/2 bg-gray-900 border border-amber-500/30 rounded-lg p-2.5 text-white focus:ring-amber-500 focus:border-amber-500" placeholder="0.00" />
-                </div>
-              )}
-           </div>
-           
-           <div className="pt-4 flex justify-end gap-3 border-t border-gray-800 mt-6">
-              <button type="button" onClick={() => setIsModuleModalOpen(false)} className="px-5 py-2.5 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition">Cancel</button>
-               <button 
-                type="submit" 
-                disabled={isSubmitting}
-                className="px-5 py-2.5 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition flex items-center gap-2 disabled:opacity-50"
+            )}
+
+            {/* Actions */}
+            <div className="pt-4 flex justify-end gap-3 border-t border-gray-800">
+              <button
+                type="button"
+                onClick={() => setIsModuleSettingsModalOpen(false)}
+                className="px-4 py-2 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700 transition"
               >
-                 {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                 {isSubmitting ? 'Saving...' : (isEditModuleMode ? 'Save Changes' : 'Add Module')}
+                Annuler
               </button>
-           </div>
-        </form>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="px-5 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition flex items-center gap-2 disabled:opacity-50 font-semibold cursor-pointer"
+              >
+                {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                {isSubmitting ? 'Enregistrement...' : 'Enregistrer les paramètres'}
+              </button>
+            </div>
+          </form>
+        )}
       </StoreModal>
+
+
 
     </div>
   );

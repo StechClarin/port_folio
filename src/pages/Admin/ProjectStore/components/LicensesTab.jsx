@@ -157,7 +157,16 @@ const LicensesTab = () => {
                   };
                 });
         
-                const { error: licenseError } = await supabase.from('tenant_licenses').insert(licenseEntries);
+                let { error: licenseError } = await supabase.from('tenant_licenses').insert(licenseEntries);
+                if (licenseError && (licenseError.code === '42703' || licenseError.message?.includes('allowed_tags'))) {
+                  const fallbackEntries = baseModules.map(m => ({
+                    tenant_id: selectedCustomerId,
+                    module_id: m.id,
+                    allowed_pages: m.allowed_tags || m.allowed_pages || []
+                  }));
+                  const res = await supabase.from('tenant_licenses').insert(fallbackEntries);
+                  licenseError = res.error;
+                }
                 if (licenseError) throw licenseError;
               }
         
@@ -201,7 +210,7 @@ const LicensesTab = () => {
           .eq('module_id', moduleId);
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        let { error } = await supabase
           .from('tenant_licenses')
           .insert([{
             tenant_id: selectedCustomerId,
@@ -209,6 +218,16 @@ const LicensesTab = () => {
             allowed_tags: effectiveTags,
             allowed_pages: effectiveTags
           }]);
+        if (error && (error.code === '42703' || error.message?.includes('allowed_tags'))) {
+          const res = await supabase
+            .from('tenant_licenses')
+            .insert([{
+              tenant_id: selectedCustomerId,
+              module_id: moduleId,
+              allowed_pages: effectiveTags
+            }]);
+          error = res.error;
+        }
         if (error) throw error;
       }
 
@@ -369,11 +388,7 @@ const LicensesTab = () => {
                                     <div>
                                        <h4 className={`font-semibold flex items-center gap-2 ${hasAccess ? 'text-emerald-100' : 'text-gray-300'}`}>
                                           {module.name}
-                                          {module.tier && (
-                                            <span className="text-[9px] bg-gray-950 px-1.5 py-0.5 rounded text-gray-400 uppercase font-mono font-bold border border-gray-800">
-                                              {module.tier}
-                                            </span>
-                                          )}
+
                                        </h4>
                                        {module.is_premium ? (
                                           <span className="text-[10px] font-bold uppercase tracking-wider text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 mt-1 inline-block">
