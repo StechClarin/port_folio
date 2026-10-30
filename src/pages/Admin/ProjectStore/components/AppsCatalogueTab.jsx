@@ -700,7 +700,7 @@ const AppsCatalogueTab = () => {
                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
                      <span className="flex items-center gap-1.5">
                        <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                       <strong className="text-emerald-400">{appModules.filter(m => !m.is_premium).length}</strong> inclus de base
+                       <strong className="text-emerald-400">{appModules.filter(m => !m.is_premium && m.code !== 'mod-free').length}</strong> inclus de base
                      </span>
                      <span>•</span>
                      <span className="flex items-center gap-1.5">
@@ -732,8 +732,10 @@ const AppsCatalogueTab = () => {
                      <div
                        key={mod.id}
                        className={`p-5 rounded-2xl border transition-all duration-200 group relative flex flex-col justify-between ${
-                         isPremium 
-                           ? 'bg-gradient-to-br from-gray-800/90 via-gray-800/80 to-amber-950/20 border-amber-500/30 hover:border-amber-500/50 shadow-sm' 
+                          mod.code === 'mod-free'
+                            ? 'bg-gradient-to-br from-gray-800/90 via-gray-800/80 to-purple-950/20 border-purple-500/30 hover:border-purple-500/50 shadow-sm'
+                            : isPremium 
+                              ? 'bg-gradient-to-br from-gray-800/90 via-gray-800/80 to-amber-950/20 border-amber-500/30 hover:border-amber-500/50 shadow-sm' 
                            : 'bg-gradient-to-br from-gray-800/90 via-gray-800/80 to-emerald-950/20 border-emerald-500/20 hover:border-emerald-500/40'
                        }`}
                      >
@@ -775,7 +777,17 @@ const AppsCatalogueTab = () => {
 
                            {/* Status Badge: Inclus vs Premium */}
                            <div className="shrink-0 flex flex-col items-end">
-                             {isPremium ? (
+                             {mod.code === 'mod-free' ? (
+                                <>
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-purple-500/15 text-purple-400 border border-purple-500/30 shadow-sm">
+                                    <Sparkles size={11} className="text-purple-400" />
+                                    Capacités libres
+                                  </span>
+                                  <span className="text-[10px] text-purple-400/80 font-mono mt-1">
+                                    Pool transversal (hors base)
+                                  </span>
+                                </>
+                              ) : isPremium ? (
                                <>
                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 shadow-sm">
                                    <Sparkles size={11} className="text-amber-400" />
@@ -823,11 +835,18 @@ const AppsCatalogueTab = () => {
 
                        {/* Card Bottom Actions: Paramètres + Supprimer */}
                        <div className="mt-4 pt-3 border-t border-gray-700/60 flex items-center justify-between">
-                         <span className={`text-[11px] font-mono font-medium ${isPremium ? 'text-amber-400/80' : 'text-emerald-400/80'}`}>
-                           {isPremium ? '⚡ Option payante' : '✓ Licence standard'}
-                         </span>
+                         <span className={`text-[11px] font-mono font-medium ${
+                            mod.code === 'mod-free' 
+                              ? 'text-purple-400/80' 
+                              : isPremium 
+                                ? 'text-amber-400/80' 
+                                : 'text-emerald-400/80'
+                          }`}>
+                            {mod.code === 'mod-free' ? ' Pool de capacités' : isPremium ? '⚡ Option payante' : '✓ Licence standard'}
+                          </span>
                          <div className="flex items-center gap-2">
-                           <button
+                           {mod.code !== 'mod-free' && (
+                            <button
                              onClick={() => handleOpenModuleSettings(mod)}
                              className="px-2.5 py-1.5 text-xs rounded-lg bg-gray-700/80 hover:bg-violet-600 text-gray-200 hover:text-white border border-gray-600 hover:border-violet-500/60 transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
                              title="Configurer ce module (Inclus / Premium & Prix)"
@@ -835,6 +854,7 @@ const AppsCatalogueTab = () => {
                              <Settings size={13} className="text-violet-300" />
                              <span>Paramètres</span>
                            </button>
+                            )}
                            <button
                              onClick={() => handleDeleteModule(mod.id, mod.name)}
                              className="p-1.5 text-xs rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"

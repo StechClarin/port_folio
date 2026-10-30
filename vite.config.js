@@ -7,8 +7,9 @@ export default defineConfig({
   server: {
     proxy: {
       '/vps-proxy': {
-        target: 'http://72.60.2.96:8080',
+        target: 'https://eteyelo.online',
         changeOrigin: true,
+        secure: false,
         rewrite: (path) => path.replace(/^\/vps-proxy/, ''),
       },
     },

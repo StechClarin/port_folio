@@ -120,10 +120,14 @@ const LicensesTab = () => {
               if (!apiUrl) throw new Error("L'URL de l'API Cloud de l'application n'est pas configurée.");
               
               const apiKey = import.meta.env.VITE_HUB_API_KEY;
-              const normalizedApiUrl = apiUrl.replace(/\/api\/?$/, '').replace(/\/+$/, '');
+              let normalizedApiUrl = apiUrl.trim();
+              normalizedApiUrl = normalizedApiUrl.replace(/\/api\/?$/, '');
+              normalizedApiUrl = normalizedApiUrl.replace(/\/schoolmanage(?:\/test)?\/?$/, '');
+              normalizedApiUrl = normalizedApiUrl.replace(/\/admin\/?$/, '');
+              normalizedApiUrl = normalizedApiUrl.replace(/\/+$/, '');
               const hubId = customer.hub_id || customer.hubId || `ETH-NANOS-${customer.id.replace(/-/g, '').slice(0, 8).toUpperCase()}`;
 
-              const baseModules = modules.filter(m => m.app_id === app.id && !m.is_premium);
+              const baseModules = modules.filter(m => m.app_id === app.id && !m.is_premium && m.code !== 'mod-free');
               const baseModuleCodes = baseModules.map(m => m.code).filter(Boolean);
 
               const response = await fetch(`${normalizedApiUrl}/api/external/provision-tenant/`, {
@@ -147,26 +151,12 @@ const LicensesTab = () => {
               }
         
               if (baseModules.length > 0) {
-                const licenseEntries = baseModules.map(m => {
-                  const effectiveTags = m.allowed_tags || m.allowed_pages || [];
-                  return {
-                    tenant_id: selectedCustomerId,
-                    module_id: m.id,
-                    allowed_tags: effectiveTags,
-                    allowed_pages: effectiveTags
-                  };
-                });
+                const licenseEntries = baseModules.map(m => ({
+                  tenant_id: selectedCustomerId,
+                  module_id: m.id
+                }));
         
-                let { error: licenseError } = await supabase.from('tenant_licenses').insert(licenseEntries);
-                if (licenseError && (licenseError.code === '42703' || licenseError.message?.includes('allowed_tags'))) {
-                  const fallbackEntries = baseModules.map(m => ({
-                    tenant_id: selectedCustomerId,
-                    module_id: m.id,
-                    allowed_pages: m.allowed_tags || m.allowed_pages || []
-                  }));
-                  const res = await supabase.from('tenant_licenses').insert(fallbackEntries);
-                  licenseError = res.error;
-                }
+                const { error: licenseError } = await supabase.from('tenant_licenses').insert(licenseEntries);
                 if (licenseError) throw licenseError;
               }
         
@@ -210,24 +200,12 @@ const LicensesTab = () => {
           .eq('module_id', moduleId);
         if (error) throw error;
       } else {
-        let { error } = await supabase
+        const { error } = await supabase
           .from('tenant_licenses')
           .insert([{
             tenant_id: selectedCustomerId,
-            module_id: moduleId,
-            allowed_tags: effectiveTags,
-            allowed_pages: effectiveTags
+            module_id: moduleId
           }]);
-        if (error && (error.code === '42703' || error.message?.includes('allowed_tags'))) {
-          const res = await supabase
-            .from('tenant_licenses')
-            .insert([{
-              tenant_id: selectedCustomerId,
-              module_id: moduleId,
-              allowed_pages: effectiveTags
-            }]);
-          error = res.error;
-        }
         if (error) throw error;
       }
 
@@ -237,7 +215,11 @@ const LicensesTab = () => {
       const apiKey = import.meta.env.VITE_HUB_API_KEY;
       
       if (apiUrl && apiKey && moduleObj.code) {
-        const normalizedApiUrl = apiUrl.replace(/\/api\/?$/, '').replace(/\/+$/, '');
+        let normalizedApiUrl = apiUrl.trim();
+        normalizedApiUrl = normalizedApiUrl.replace(/\/api\/?$/, '');
+        normalizedApiUrl = normalizedApiUrl.replace(/\/schoolmanage(?:\/test)?\/?$/, '');
+        normalizedApiUrl = normalizedApiUrl.replace(/\/admin\/?$/, '');
+        normalizedApiUrl = normalizedApiUrl.replace(/\/+$/, '');
         const hubId = customer.hub_id || customer.hubId || `ETH-NANOS-${customer.id.replace(/-/g, '').slice(0, 8).toUpperCase()}`;
 
         const response = await fetch(`${normalizedApiUrl}/api/external/unlock-module/`, {
@@ -390,7 +372,11 @@ const LicensesTab = () => {
                                           {module.name}
 
                                        </h4>
-                                       {module.is_premium ? (
+                                       {module.code === 'mod-free' ? (
+                                          <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20 mt-1 inline-block">
+                                             FreeTags / Transversal
+                                          </span>
+                                       ) : module.is_premium ? (
                                           <span className="text-[10px] font-bold uppercase tracking-wider text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 mt-1 inline-block">
                                              Premium
                                           </span>

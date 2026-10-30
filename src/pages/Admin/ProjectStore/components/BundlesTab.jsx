@@ -525,10 +525,10 @@ const BundlesTab = () => {
            </div>
 
            {/* --- SÉLECTION DES CONTENUS DU PACK --- */}
-           {/* 1. Modules Métier de l'Application (Regroupés avec leurs tags) */}
+           {/* 1. Modules Premium Additionnels (Regroupés avec leurs tags) */}
            {(() => {
               const currentAppId = formData.appId || selectedAppId;
-              const appBusinessModules = modules.filter(m => m.app_id === currentAppId && m.code !== 'mod-free' && !m.code?.startsWith('free-'));
+              const appPremiumModules = modules.filter(m => m.app_id === currentAppId && m.is_premium && m.code !== 'mod-free' && !m.code?.startsWith('free-'));
               const freeTagsMod = modules.find(m => m.app_id === currentAppId && m.code === 'mod-free');
               const freeTagsList = freeTagsMod ? (freeTagsMod.allowed_tags || freeTagsMod.allowed_pages || []) : [];
 
@@ -537,19 +537,24 @@ const BundlesTab = () => {
                     <div className="pt-4 border-t border-gray-700/60 space-y-4">
                        <div className="flex justify-between items-center">
                           <div className="flex items-center gap-2">
-                             <Box size={18} className="text-yellow-400" />
-                             <h4 className="text-sm font-bold text-white uppercase tracking-wider">
-                                Modules Métier de l'Application
-                             </h4>
+                             <Sparkles size={18} className="text-amber-400" />
+                             <div>
+                                <h4 className="text-sm font-bold text-white uppercase tracking-wider">
+                                   Modules Premium de l'Application
+                                </h4>
+                                <p className="text-xs text-gray-400">
+                                   Options payantes hors licence standard pouvant être intégrées dans ce pack
+                                </p>
+                             </div>
                           </div>
-                          <div className="text-xs text-gray-400 font-mono">
-                             {appBusinessModules.filter(m => (m.allowed_tags || m.allowed_pages || []).some(t => (formData.allowedTags || []).includes(t))).length} / {appBusinessModules.length} modules sélectionnés
+                          <div className="text-xs text-amber-300/80 font-mono">
+                             {appPremiumModules.filter(m => (m.allowed_tags || m.allowed_pages || []).some(t => (formData.allowedTags || []).includes(t))).length} / {appPremiumModules.length} modules premium
                           </div>
                        </div>
 
-                       {/* Liste des modules métier avec leurs tags regroupés */}
+                       {/* Liste des modules premium avec leurs tags regroupés */}
                        <div className="space-y-3 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
-                          {appBusinessModules.map(mod => {
+                          {appPremiumModules.map(mod => {
                              const modTags = mod.allowed_tags || mod.allowed_pages || [];
                              const currentTags = formData.allowedTags || [];
                              const allModTagsSelected = modTags.length > 0 && modTags.every(t => currentTags.includes(t));
@@ -560,28 +565,22 @@ const BundlesTab = () => {
                                    key={mod.id}
                                    className={`p-3.5 rounded-xl border transition-all ${
                                       someModTagsSelected 
-                                         ? 'bg-yellow-500/10 border-yellow-500/40 shadow-sm' 
+                                         ? 'bg-amber-500/10 border-amber-500/40 shadow-sm' 
                                          : 'bg-gray-800/40 border-gray-700/80 hover:border-gray-600'
                                    }`}
                                 >
                                    {/* En-tête du module */}
                                    <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-gray-700/50">
                                       <div className="flex items-center gap-2.5">
-                                         <div className="w-7 h-7 rounded-lg bg-gray-900 border border-gray-700 flex items-center justify-center text-yellow-400 text-xs shrink-0">
-                                            <Layers size={14} />
+                                         <div className="w-7 h-7 rounded-lg bg-gray-900 border border-amber-500/30 flex items-center justify-center text-amber-400 text-xs shrink-0">
+                                            <Sparkles size={14} />
                                          </div>
                                           <div>
                                              <div className="flex items-center gap-2">
                                                 <span className="text-sm font-bold text-white block leading-tight">{mod.name}</span>
-                                                {mod.is_premium ? (
-                                                   <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30 font-semibold">
-                                                      Premium {mod.price > 0 ? `(${mod.price}€)` : ''}
-                                                   </span>
-                                                ) : (
-                                                   <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30 font-semibold">
-                                                      Inclus
-                                                   </span>
-                                                )}
+                                                <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30 font-semibold">
+                                                   Premium {mod.price > 0 ? `(${mod.price}€)` : ''}
+                                                </span>
                                              </div>
                                              <span className="text-[10px] text-gray-400 font-mono">{mod.code}</span>
                                           </div>
@@ -592,8 +591,8 @@ const BundlesTab = () => {
                                          onClick={() => toggleAllTagsForModule(mod)}
                                          className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all uppercase tracking-wider ${
                                             allModTagsSelected
-                                               ? 'bg-yellow-500 text-black border-yellow-400 shadow-sm'
-                                               : 'bg-gray-800 text-gray-300 border-gray-600 hover:border-yellow-400/60 hover:text-yellow-300'
+                                               ? 'bg-amber-500 text-black border-amber-400 shadow-sm'
+                                               : 'bg-gray-800 text-gray-300 border-gray-600 hover:border-amber-400/60 hover:text-amber-300'
                                          }`}
                                       >
                                          {allModTagsSelected ? 'Tout décocher' : 'Tout cocher'}
@@ -611,12 +610,12 @@ const BundlesTab = () => {
                                                onClick={() => toggleTag(tag, mod.id)}
                                                className={`px-2.5 py-1 rounded-lg text-xs font-mono font-medium flex items-center gap-1.5 border transition-all cursor-pointer ${
                                                   isTagSelected
-                                                     ? 'bg-yellow-400 text-black font-bold border-yellow-300 shadow-sm'
+                                                     ? 'bg-amber-400 text-black font-bold border-amber-300 shadow-sm'
                                                      : 'bg-gray-900/80 text-gray-400 border-gray-700 hover:border-gray-500 hover:text-gray-200'
                                                }`}
                                             >
                                                <div className={`w-3.5 h-3.5 rounded flex items-center justify-center text-[10px] ${
-                                                  isTagSelected ? 'bg-black text-yellow-400' : 'border border-gray-600'
+                                                  isTagSelected ? 'bg-black text-amber-400' : 'border border-gray-600'
                                                }`}>
                                                   {isTagSelected && <Check size={10} className="stroke-[3]" />}
                                                </div>
@@ -632,9 +631,9 @@ const BundlesTab = () => {
                              );
                           })}
 
-                          {appBusinessModules.length === 0 && (
+                          {appPremiumModules.length === 0 && (
                              <div className="bg-gray-900/60 border border-dashed border-gray-700 rounded-lg p-4 text-center text-xs text-gray-400">
-                                Aucun module métier trouvé pour cette application.
+                                Aucun module premium configuré pour cette application. Utilisez les options libres (Free Tags) ci-dessous pour composer ce pack.
                              </div>
                           )}
                        </div>
